@@ -18,6 +18,7 @@ import {
   RankingIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { useAuthUser } from "@/components/auth-user-provider";
 import { toast } from "@/lib/toast";
 import type { AppSettings } from "@/lib/app-settings";
 
@@ -47,6 +48,7 @@ const systemItems: NavItem[] = [
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "main-sidebar-collapsed";
 
 export function MainSidebar({ settings }: { settings: AppSettings }) {
+  const user = useAuthUser();
   const pathname = usePathname();
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
@@ -97,6 +99,7 @@ export function MainSidebar({ settings }: { settings: AppSettings }) {
           currentYear={currentYear}
           appVersion={appVersion}
           settings={settings}
+          role={user.role}
           onToggleCollapsed={() => setCollapsed((value) => !value)}
           onLogoutClick={() => setIsLogoutOpen(true)}
         />
@@ -118,6 +121,7 @@ export function MainSidebar({ settings }: { settings: AppSettings }) {
                 currentYear={currentYear}
                 appVersion={appVersion}
                 settings={settings}
+                role={user.role}
                 mobile
                 onCloseMobile={() => setIsMobileOpen(false)}
                 onLogoutClick={() => setIsLogoutOpen(true)}
@@ -158,6 +162,7 @@ function SidebarContent({
   currentYear,
   appVersion,
   settings,
+  role,
   mobile = false,
   onToggleCollapsed,
   onCloseMobile,
@@ -168,6 +173,7 @@ function SidebarContent({
   currentYear: number;
   appVersion: string;
   settings: AppSettings;
+  role: "ADMIN" | "USER";
   mobile?: boolean;
   onToggleCollapsed?: () => void;
   onCloseMobile?: () => void;
@@ -230,7 +236,11 @@ function SidebarContent({
         />
         <SidebarGroup
           title="SYSTEM"
-          items={systemItems}
+          items={systemItems.filter((item) =>
+            role === "ADMIN"
+              ? true
+              : !["Users", "Vessel", "Rank", "Settings"].includes(item.label)
+          )}
           pathname={pathname}
           collapsed={collapsed}
           className={collapsed ? "mt-3" : "mt-6"}

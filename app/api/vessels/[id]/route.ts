@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
-import { assertApiSession } from "@/lib/auth";
+import { assertAdminApiSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { normalizeEnumValue } from "@/lib/enums";
 
@@ -10,7 +10,7 @@ export async function PATCH(
   request: Request,
   context: RouteContext<"/api/vessels/[id]">
 ) {
-  const unauthorized = await assertApiSession();
+  const unauthorized = await assertAdminApiSession();
   if (unauthorized) return unauthorized;
 
   const { id } = await context.params;
@@ -63,7 +63,7 @@ export async function DELETE(
   _request: Request,
   context: RouteContext<"/api/vessels/[id]">
 ) {
-  const unauthorized = await assertApiSession();
+  const unauthorized = await assertAdminApiSession();
   if (unauthorized) return unauthorized;
 
   const { id } = await context.params;

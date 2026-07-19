@@ -70,3 +70,23 @@ export async function assertApiSession() {
 
   return null;
 }
+
+export async function assertAdminApiSession() {
+  const user = await getAuthenticatedUser();
+
+  if (!user) {
+    return NextResponse.json(
+      { message: "Unauthorized", code: "SESSION_ENDED" },
+      { status: 401 }
+    );
+  }
+
+  if (user.role !== "ADMIN") {
+    return NextResponse.json(
+      { message: "Forbidden", code: "FORBIDDEN" },
+      { status: 403 }
+    );
+  }
+
+  return null;
+}

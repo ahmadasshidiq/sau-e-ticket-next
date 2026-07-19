@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { assertApiSession } from "@/lib/auth";
+import { assertAdminApiSession, assertApiSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(request: Request) {
@@ -50,7 +50,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const unauthorized = await assertApiSession();
+  const unauthorized = await assertAdminApiSession();
   if (unauthorized) return unauthorized;
 
   const body = await request.json();

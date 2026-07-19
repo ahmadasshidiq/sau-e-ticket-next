@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { assertApiSession } from "@/lib/auth";
+import { assertAdminApiSession, assertApiSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 function normalizeOptionalString(value: unknown) {
@@ -42,7 +42,7 @@ export async function GET() {
 }
 
 export async function PATCH(request: Request) {
-  const unauthorized = await assertApiSession();
+  const unauthorized = await assertAdminApiSession();
   if (unauthorized) return unauthorized;
 
   const body = await request.json();

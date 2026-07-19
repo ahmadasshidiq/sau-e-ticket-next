@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { assertApiSession } from "@/lib/auth";
+import { assertAdminApiSession } from "@/lib/auth";
 import { uploadToMinio } from "@/lib/minio";
 
 const ALLOWED_FIELDS = ["logoWhite", "logoColored", "favicon"] as const;
@@ -15,7 +15,7 @@ const ALLOWED_TYPES = [
 const MAX_FILE_SIZE = 2 * 1024 * 1024;
 
 export async function POST(request: Request) {
-  const unauthorized = await assertApiSession();
+  const unauthorized = await assertAdminApiSession();
   if (unauthorized) return unauthorized;
 
   const formData = await request.formData();

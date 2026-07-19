@@ -1,9 +1,9 @@
-import { assertApiSession } from "@/lib/auth";
+import { assertAdminApiSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { toCsvRow } from "@/lib/csv";
 
 export async function GET() {
-  const unauthorized = await assertApiSession();
+  const unauthorized = await assertAdminApiSession();
   if (unauthorized) return unauthorized;
 
   const users = await prisma.user.findMany({

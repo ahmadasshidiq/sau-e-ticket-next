@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { assertApiSession } from "@/lib/auth";
+import { assertAdminApiSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { parseCsv } from "@/lib/csv";
 import { hashPassword } from "@/lib/crypto";
@@ -9,7 +9,7 @@ const USER_ROLES = ["ADMIN", "USER"] as const;
 const USER_STATUSES = ["ACTIVE", "INACTIVE"] as const;
 
 export async function POST(request: Request) {
-  const unauthorized = await assertApiSession();
+  const unauthorized = await assertAdminApiSession();
   if (unauthorized) return unauthorized;
 
   const formData = await request.formData();
