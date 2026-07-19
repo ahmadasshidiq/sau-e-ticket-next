@@ -479,7 +479,7 @@ function ToolbarActionButton({
       type="button"
       variant="outline"
       onClick={action.onClick}
-      className={`h-[50px] rounded-[16px] border-[#d8d8d8] bg-white px-5 text-[14px] font-medium text-[#111827] dark:border-white/10 dark:bg-[#111827] dark:text-white ${halfOnMobile ? "w-full" : "w-full sm:w-auto"}`}
+      className={`h-[50px] rounded-[16px] border-[#d8d8d8] bg-white px-5 text-[14px] font-medium text-[#111827] dark:border-white/10 dark:bg-[#111827] dark:text-white ${halfOnMobile ? "w-full sm:w-auto" : "w-full sm:w-auto"}`}
     >
       {action.icon}
       {action.label}
