@@ -1,0 +1,166 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  USER
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum TemplateType {
+  INVOICE
+  FLIGHT_TICKET
+}
+
+enum VesselType {
+  CREWING_TANKER
+  CMOS
+  TAD
+}
+
+model User {
+  id            String     @id @default(cuid())
+  name          String
+  email         String     @unique
+  password      String
+  currentToken  String?    @map("current_token")
+  salt          String
+  status        UserStatus @default(ACTIVE)
+  role          UserRole   @default(USER)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+}
+
+model Setting {
+  id              String   @id @default(cuid())
+  favicon         String?
+  applicationName String
+  companyName     String?
+  logoWhite       String?
+  logoColored     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Template {
+  id          String       @id @default(cuid())
+  name        String
+  type        TemplateType
+  preview     String?
+  html        String       @db.Text
+  description String?
+  isDefault   Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model Vessel {
+  id          String @id @default(cuid())
+  name        String @unique
+  type        VesselType
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  invoiceItems InvoiceItem[]
+}
+
+model Rank {
+  id          String @id @default(cuid())
+  name        String @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  invoiceItems InvoiceItem[]
+}
+
+model Invoice {
+  id               String        @id @default(cuid())
+  invoiceNumber    String?
+  vendor           String?
+  customer         String?
+  invoiceDate      DateTime?
+  dueDate          DateTime?
+  subtotal         Decimal? @db.Decimal(18,2)
+  tax              Decimal? @db.Decimal(18,2)
+  total            Decimal? @db.Decimal(18,2)
+  notes            String? @db.Text
+  originalFileName String
+  objectKey        String
+  currency         String? @default("IDR")
+  rawText          String?       @db.Text
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  items            InvoiceItem[]
+  @@index([invoiceDate])
+  @@index([customer])
+  @@index([vendor])
+}
+
+model InvoiceItem {
+  id               String @id @default(cuid())
+  invoiceId        String
+  invoice          Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  vesselId         String?
+  vessel           Vessel? @relation(fields: [vesselId], references: [id])
+  passenger        String
+  rankId           String?
+  rank             Rank? @relation(fields: [rankId], references: [id])
+  status           String?
+  serviceArea      String?
+  serviceMode      String?
+  serviceProvider  String?
+  serviceDetail    String?
+  lineNumber       Int?
+  fare             Decimal? @db.Decimal(18,2)
+}
+
+model FlightTicket {
+  id                String      @id @default(cuid())
+  pnr               String?
+  ticketNumber      String?
+  airline           String?
+  flightNumber      String?
+  cabinClass        String?
+  departureAirport  String?
+  arrivalAirport    String?
+  departureTerminal String?
+  departureGate     String?
+  departureDate     DateTime?
+  arrivalDate       DateTime?
+  departureTime     String?
+  arrivalTerminal   String?
+  arrivalTime       String?
+  duration          String?
+  currency          String? @default("IDR")
+  fare              Decimal?     @db.Decimal(18, 2)
+  tax               Decimal?     @db.Decimal(18, 2)
+  grandTotal        Decimal?     @db.Decimal(18, 2)
+  originalFileName  String
+  objectKey         String
+  rawText           String?      @db.Text
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  passengers        Passenger[]
+  @@index([pnr])
+  @@index([departureDate])
+}
+
+model Passenger {
+  id             String       @id @default(cuid())
+  flightTicketId String
+  flightTicket   FlightTicket @relation(fields: [flightTicketId], references: [id], onDelete: Cascade)
+  title          String?
+  name           String
+  passengerType  String?
+  baggage        String?
+  ticketNumber   String?
+  createdAt      DateTime @default(now())
+}

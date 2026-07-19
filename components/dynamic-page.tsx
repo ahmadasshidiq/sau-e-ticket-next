@@ -12,7 +12,9 @@ import {
   ArrowDown01Icon,
   Cancel01Icon,
   CheckmarkCircle02Icon,
+  FileEmpty02Icon,
   FilterHorizontalIcon,
+  Loading03Icon,
   Upload01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -39,6 +41,7 @@ type ToolbarAction = {
   label: string;
   onClick?: () => void;
   icon?: ReactNode;
+  variant?: "primary" | "secondary";
 };
 
 type FilterField = {
@@ -51,6 +54,7 @@ type DynamicPageProps<T> = {
   columns: DataColumn<T>[];
   rows: T[];
   primaryAction?: ToolbarAction;
+  secondaryActions?: ToolbarAction[];
   filterContent?: ReactNode;
   columnContent?: ReactNode;
   filterFields?: FilterField[];
@@ -58,12 +62,26 @@ type DynamicPageProps<T> = {
   pageSizeOptions?: number[];
   initialPageSize?: number;
   rowKey?: (row: T, index: number) => string;
+  currentPage?: number;
+  totalPages?: number;
+  totalRows?: number;
+  currentPageSize?: number;
+  onPageChange?: (page: number) => void;
+  onPageSizeChange?: (pageSize: number) => void;
+  filterValues?: Record<string, string>;
+  onFilterValuesChange?: (values: Record<string, string>) => void;
+  onApplyFilters?: (values: Record<string, string>) => void;
+  onResetFilters?: () => void;
+  serverSideFiltering?: boolean;
+  serverSidePagination?: boolean;
+  loading?: boolean;
 };
 
 export function DynamicPage<T>({
   columns,
   rows,
   primaryAction,
+  secondaryActions = [],
   filterContent,
   columnContent,
   filterFields = [],
@@ -71,6 +89,19 @@ export function DynamicPage<T>({
   pageSizeOptions = [10, 25, 50],
   initialPageSize = 10,
   rowKey,
+  currentPage,
+  totalPages: controlledTotalPages,
+  totalRows,
+  currentPageSize,
+  onPageChange,
+  onPageSizeChange,
+  filterValues: controlledFilterValues,
+  onFilterValuesChange,
+  onApplyFilters,
+  onResetFilters,
+  serverSideFiltering = false,
+  serverSidePagination = false,
+  loading = false,
 }: DynamicPageProps<T>) {
   const columnTriggerRef = useRef<HTMLDivElement | null>(null);
   const columnDropdownRef = useRef<HTMLDivElement | null>(null);
@@ -85,8 +116,39 @@ export function DynamicPage<T>({
       .map((column) => String(column.key))
   );
 
-  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
-  const safePage = Math.min(page, totalPages);
+  const effectiveFilterValues = controlledFilterValues ?? filterValues;
+  const effectivePageSize = currentPageSize ?? pageSize;
+
+  const filteredRows = useMemo(() => {
+    if (serverSideFiltering) {
+      return rows;
+    }
+
+    const activeFilters = Object.entries(filterValues).filter(([, value]) =>
+      value.trim()
+    );
+
+    if (activeFilters.length === 0) {
+      return rows;
+    }
+
+    return rows.filter((row) =>
+      activeFilters.every(([key, value]) => {
+        const source = (row as Record<string, unknown>)[key];
+        return String(source ?? "")
+          .toLowerCase()
+          .includes(value.toLowerCase());
+      })
+    );
+  }, [filterValues, rows, serverSideFiltering]);
+
+  const computedTotalPages = Math.max(
+    1,
+    Math.ceil(filteredRows.length / effectivePageSize)
+  );
+  const totalPages = controlledTotalPages ?? computedTotalPages;
+  const effectivePage = currentPage ?? page;
+  const safePage = Math.min(effectivePage, totalPages);
   const visibleColumns = useMemo(
     () =>
       columns.filter((column) =>
@@ -96,9 +158,13 @@ export function DynamicPage<T>({
   );
 
   const visibleRows = useMemo(() => {
-    const start = (safePage - 1) * pageSize;
-    return rows.slice(start, start + pageSize);
-  }, [pageSize, rows, safePage]);
+    if (serverSidePagination) {
+      return rows;
+    }
+
+    const start = (safePage - 1) * effectivePageSize;
+    return filteredRows.slice(start, start + effectivePageSize);
+  }, [effectivePageSize, filteredRows, rows, safePage, serverSidePagination]);
 
   useEffect(() => {
     if (!isColumnOpen) return;
@@ -131,18 +197,17 @@ export function DynamicPage<T>({
   return (
     <div className="space-y-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="w-full sm:w-auto">
+        <div className="grid w-full grid-cols-2 gap-3 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
           {primaryAction ? (
-            <Button
-              onClick={primaryAction.onClick}
-              className="h-[50px] w-full rounded-[16px] bg-[#4438ff] px-6 text-[14px] font-medium text-white hover:bg-[#3c31ec] dark:bg-[#5b61ff] dark:hover:bg-[#6970ff] sm:w-auto"
-            >
-              {primaryAction.icon ?? (
-                <HugeiconsIcon icon={Upload01Icon} size={20} strokeWidth={1.8} />
-              )}
-              {primaryAction.label}
-            </Button>
+            <ToolbarActionButton action={primaryAction} primary />
           ) : null}
+          {secondaryActions.map((action) => (
+            <ToolbarActionButton
+              key={action.label}
+              action={action}
+              halfOnMobile
+            />
+          ))}
         </div>
 
         <div className="relative flex w-full flex-wrap items-center gap-3 sm:w-auto">
@@ -171,17 +236,35 @@ export function DynamicPage<T>({
       {isFilterOpen ? (
         <FilterModal
           fields={filterFields}
-          values={filterValues}
+          values={effectiveFilterValues}
           content={filterContent}
           onClose={() => setIsFilterOpen(false)}
-          onReset={() => setFilterValues({})}
+          onReset={() => {
+            if (onFilterValuesChange) {
+              onFilterValuesChange({});
+            } else {
+              setFilterValues({});
+            }
+
+            if (onResetFilters) {
+              onResetFilters();
+            }
+          }}
           onChange={(key, value) =>
-            setFilterValues((current) => ({
-              ...current,
-              [key]: value,
-            }))
+            onFilterValuesChange
+              ? onFilterValuesChange({
+                  ...effectiveFilterValues,
+                  [key]: value,
+                })
+              : setFilterValues((current) => ({
+                  ...current,
+                  [key]: value,
+                }))
           }
-          onApply={() => setIsFilterOpen(false)}
+          onApply={() => {
+            onApplyFilters?.(effectiveFilterValues);
+            setIsFilterOpen(false);
+          }}
         />
       ) : null}
 
@@ -221,6 +304,21 @@ export function DynamicPage<T>({
             />
           </div>
         ) : null}
+        {loading ? (
+          <div className="absolute inset-x-0 top-[57px] bottom-[74px] z-10 flex items-center justify-center bg-white/72 backdrop-blur-[1px] dark:bg-[#111827]/72">
+            <div className="flex flex-col items-center gap-3 text-center">
+              <HugeiconsIcon
+                icon={Loading03Icon}
+                size={30}
+                strokeWidth={1.8}
+                className="animate-spin text-[#4438ff] dark:text-[#6970ff]"
+              />
+              <p className="text-[14px] font-medium text-[#6b7280] dark:text-[#94a3b8]">
+                Loading data...
+              </p>
+            </div>
+          </div>
+        ) : null}
         <div className="overflow-x-auto">
           <table className="min-w-[980px] border-collapse md:w-full md:min-w-0 md:table-fixed">
             <thead>
@@ -258,32 +356,51 @@ export function DynamicPage<T>({
                   ))}
                 </tr>
               ))
-            : Array.from({ length: emptyRows }).map((_, index) => (
-                <tr
-                  key={`empty-${index}`}
-                  className="h-[68px] border-b border-[#ededed] dark:border-white/10 last:border-b-0"
-                >
-                  {visibleColumns.map((column) => (
-                    <td
-                      key={String(column.key)}
-                      className={`px-5 py-4 ${column.widthClassName ?? ""}`}
-                    />
-                  ))}
+            : (
+                <tr>
+                  <td
+                    colSpan={Math.max(visibleColumns.length, 1)}
+                    className="px-5 py-16"
+                  >
+                    <div className="flex flex-col items-center justify-center gap-3 text-center">
+                      <div className="flex size-14 items-center justify-center rounded-full bg-[#f3f4f6] text-[#94a3b8] dark:bg-white/5 dark:text-[#64748b]">
+                        <HugeiconsIcon
+                          icon={FileEmpty02Icon}
+                          size={26}
+                          strokeWidth={1.8}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-[16px] font-semibold text-[#374151] dark:text-[#e5e7eb]">
+                          No Data
+                        </p>
+                        <p className="text-[13px] text-[#94a3b8] dark:text-[#64748b]">
+                          There is no data to display yet.
+                        </p>
+                      </div>
+                    </div>
+                  </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>
         <div className="flex flex-col gap-4 border-t border-[#ededed] px-5 py-5 text-[#6f7482] dark:border-white/10 dark:text-[#94a3b8] sm:flex-row sm:items-center sm:justify-between">
           <div className="flex w-full items-center justify-between gap-3 text-[14px] sm:w-auto sm:justify-start">
-            <span>Row per page</span>
+            <span className="whitespace-nowrap">Row per page</span>
             <select
-              value={pageSize}
+              value={effectivePageSize}
               onChange={(event) => {
-                setPageSize(Number(event.target.value));
-                setPage(1);
+                const nextPageSize = Number(event.target.value);
+
+                if (onPageSizeChange) {
+                  onPageSizeChange(nextPageSize);
+                } else {
+                  setPageSize(nextPageSize);
+                  setPage(1);
+                }
               }}
-              className="h-[42px] rounded-[12px] border border-[#d8d8d8] bg-white px-3 text-[14px] text-[#1f2430] outline-none dark:border-white/10 dark:bg-[#151d2c] dark:text-white"
+              className="h-[42px] min-w-[84px] rounded-[12px] border border-[#d8d8d8] bg-white px-3 text-[14px] text-[#1f2430] outline-none dark:border-white/10 dark:bg-[#151d2c] dark:text-white"
             >
               {pageSizeOptions.map((option) => (
                 <option key={option} value={option}>
@@ -297,7 +414,14 @@ export function DynamicPage<T>({
             <Button
               variant="outline"
               className="h-[40px] min-w-[72px] rounded-[12px] border-[#d8d8d8] px-4 text-[#4b5160] dark:border-white/10 dark:bg-[#151d2c] dark:text-[#d1d5db]"
-              onClick={() => setPage((current) => Math.max(1, current - 1))}
+              onClick={() => {
+                const nextPage = Math.max(1, safePage - 1);
+                if (onPageChange) {
+                  onPageChange(nextPage);
+                } else {
+                  setPage(nextPage);
+                }
+              }}
               disabled={safePage <= 1}
             >
               Prev
@@ -308,7 +432,14 @@ export function DynamicPage<T>({
             <Button
               variant="outline"
               className="h-[40px] min-w-[72px] rounded-[12px] border-[#d8d8d8] px-4 text-[#4b5160] dark:border-white/10 dark:bg-[#151d2c] dark:text-[#d1d5db]"
-              onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+              onClick={() => {
+                const nextPage = Math.min(totalPages, safePage + 1);
+                if (onPageChange) {
+                  onPageChange(nextPage);
+                } else {
+                  setPage(nextPage);
+                }
+              }}
               disabled={safePage >= totalPages}
             >
               Next
@@ -317,6 +448,42 @@ export function DynamicPage<T>({
         </div>
       </div>
     </div>
+  );
+}
+
+function ToolbarActionButton({
+  action,
+  primary = false,
+  halfOnMobile = false,
+}: {
+  action: ToolbarAction;
+  primary?: boolean;
+  halfOnMobile?: boolean;
+}) {
+  if (primary) {
+    return (
+      <Button
+        onClick={action.onClick}
+        className="col-span-2 h-[50px] w-full rounded-[16px] bg-[#4438ff] px-6 text-[14px] font-medium text-white hover:bg-[#3c31ec] dark:bg-[#5b61ff] dark:hover:bg-[#6970ff] sm:w-auto"
+      >
+        {action.icon ?? (
+          <HugeiconsIcon icon={Upload01Icon} size={20} strokeWidth={1.8} />
+        )}
+        {action.label}
+      </Button>
+    );
+  }
+
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      onClick={action.onClick}
+      className={`h-[50px] rounded-[16px] border-[#d8d8d8] bg-white px-5 text-[14px] font-medium text-[#111827] dark:border-white/10 dark:bg-[#111827] dark:text-white ${halfOnMobile ? "w-full" : "w-full sm:w-auto"}`}
+    >
+      {action.icon}
+      {action.label}
+    </Button>
   );
 }
 

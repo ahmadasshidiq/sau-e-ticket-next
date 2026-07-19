@@ -14,9 +14,12 @@ import {
   UserMultipleIcon,
   Logout01Icon,
   Menu02Icon,
+  BoatIcon,
+  RankingIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { toast } from "@/lib/toast";
+import type { AppSettings } from "@/lib/app-settings";
 
 type NavItem = {
   label: string;
@@ -34,14 +37,16 @@ const documentItems: NavItem[] = [
 ];
 
 const systemItems: NavItem[] = [
-  { label: "Settings", href: "/settings", icon: Settings05Icon },
   { label: "Users", href: "/users", icon: UserMultipleIcon },
+  { label: "Vessel", href: "/vessels", icon: BoatIcon },
+  { label: "Rank", href: "/ranks", icon: RankingIcon },
+  { label: "Settings", href: "/settings", icon: Settings05Icon },
   { label: "Logout", href: "/login", icon: Logout01Icon },
 ];
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "main-sidebar-collapsed";
 
-export function MainSidebar() {
+export function MainSidebar({ settings }: { settings: AppSettings }) {
   const pathname = usePathname();
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
@@ -83,15 +88,15 @@ export function MainSidebar() {
       </button>
 
       <aside
-        className={`sticky top-4 hidden h-[calc(100vh-2rem)] shrink-0 rounded-[28px] bg-linear-to-b from-[#4438ff] to-[#3a31f0] text-white shadow-[0_18px_40px_rgba(58,49,240,0.28)] transition-[width,padding] duration-300 dark:border dark:border-white/10 dark:from-[#182033] dark:to-[#101726] dark:text-white dark:shadow-[0_20px_44px_rgba(2,6,23,0.46)] lg:flex lg:flex-col ${
-          collapsed ? "w-[82px] px-3 py-6" : "w-[312px] px-6 py-8"
-        }`}
+        className={`sticky top-4 hidden h-[calc(100vh-2rem)] shrink-0 rounded-[28px] bg-linear-to-b from-[#4438ff] to-[#3a31f0] text-white shadow-[0_18px_40px_rgba(58,49,240,0.28)] transition-[width,padding] duration-300 dark:border dark:border-white/10 dark:from-[#182033] dark:to-[#101726] dark:text-white dark:shadow-[0_20px_44px_rgba(2,6,23,0.46)] lg:flex lg:flex-col ${collapsed ? "w-[82px] px-3 py-6" : "w-[312px] px-6 py-8"
+          }`}
       >
         <SidebarContent
           collapsed={collapsed}
           pathname={pathname}
           currentYear={currentYear}
           appVersion={appVersion}
+          settings={settings}
           onToggleCollapsed={() => setCollapsed((value) => !value)}
           onLogoutClick={() => setIsLogoutOpen(true)}
         />
@@ -99,41 +104,47 @@ export function MainSidebar() {
 
       {isMobileOpen
         ? createPortal(
-            <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-[2px] lg:hidden">
-              <button
-                type="button"
-                aria-label="Close sidebar overlay"
-                onClick={() => setIsMobileOpen(false)}
-                className="absolute inset-0"
+          <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-[2px] lg:hidden">
+            <button
+              type="button"
+              aria-label="Close sidebar overlay"
+              onClick={() => setIsMobileOpen(false)}
+              className="absolute inset-0"
+            />
+            <aside className="relative flex h-full w-[min(86vw,320px)] flex-col bg-linear-to-b from-[#4438ff] to-[#3a31f0] px-5 py-6 text-white shadow-[0_18px_40px_rgba(58,49,240,0.28)] dark:border-r dark:border-white/10 dark:from-[#182033] dark:to-[#101726] dark:text-white dark:shadow-[0_20px_44px_rgba(2,6,23,0.46)]">
+              <SidebarContent
+                collapsed={false}
+                pathname={pathname}
+                currentYear={currentYear}
+                appVersion={appVersion}
+                settings={settings}
+                mobile
+                onCloseMobile={() => setIsMobileOpen(false)}
+                onLogoutClick={() => setIsLogoutOpen(true)}
               />
-              <aside className="relative flex h-full w-[min(86vw,320px)] flex-col bg-linear-to-b from-[#4438ff] to-[#3a31f0] px-5 py-6 text-white shadow-[0_18px_40px_rgba(58,49,240,0.28)] dark:border-r dark:border-white/10 dark:from-[#182033] dark:to-[#101726] dark:text-white dark:shadow-[0_20px_44px_rgba(2,6,23,0.46)]">
-                <SidebarContent
-                  collapsed={false}
-                  pathname={pathname}
-                  currentYear={currentYear}
-                  appVersion={appVersion}
-                  mobile
-                  onCloseMobile={() => setIsMobileOpen(false)}
-                  onLogoutClick={() => setIsLogoutOpen(true)}
-                />
-              </aside>
-            </div>,
-            document.body
-          )
+            </aside>
+          </div>,
+          document.body
+        )
         : null}
 
       {isLogoutOpen ? (
         <LogoutConfirmModal
           onCancel={() => setIsLogoutOpen(false)}
-          onConfirm={() => {
+          onConfirm={async () => {
             setIsLogoutOpen(false);
             setIsMobileOpen(false);
-            toast({
-              title: "Logout berhasil",
-              description: "Kamu telah keluar dari sesi saat ini.",
-              variant: "success",
-            });
-            router.push("/login");
+            try {
+              await fetch("/api/auth/logout", { method: "POST" });
+              toast({
+                title: "Logout success",
+                description: "You have logged out of your current session.",
+                variant: "success",
+              });
+            } finally {
+              router.push("/login");
+              router.refresh();
+            }
           }}
         />
       ) : null}
@@ -146,6 +157,7 @@ function SidebarContent({
   pathname,
   currentYear,
   appVersion,
+  settings,
   mobile = false,
   onToggleCollapsed,
   onCloseMobile,
@@ -155,6 +167,7 @@ function SidebarContent({
   pathname: string;
   currentYear: number;
   appVersion: string;
+  settings: AppSettings;
   mobile?: boolean;
   onToggleCollapsed?: () => void;
   onCloseMobile?: () => void;
@@ -164,13 +177,21 @@ function SidebarContent({
     <>
       <div className={`flex ${collapsed ? "flex-col items-center gap-5" : "items-start justify-between"}`}>
         <div className={`relative ${collapsed ? "h-12 w-12" : "h-10 w-[70px]"}`}>
-          <Image
-            src="/img/logo-putih.png"
-            alt="Logo"
-            fill
-            priority
-            className="object-contain"
-          />
+          {settings.logoWhite || settings.logoColored ? (
+            <img
+              src={settings.logoWhite || settings.logoColored || ""}
+              alt={settings.applicationName}
+              className="h-full w-full object-contain"
+            />
+          ) : (
+            <Image
+              src="/img/logo-putih.png"
+              alt={settings.applicationName}
+              fill
+              priority
+              className="object-contain"
+            />
+          )}
         </div>
         {mobile ? (
           <button
@@ -218,9 +239,9 @@ function SidebarContent({
       </nav>
 
       <p
-        className={`text-white/86 dark:text-white/55 ${collapsed ? "self-center text-center text-[12px] font-medium [writing-mode:vertical-rl] rotate-180" : "pt-6 text-[12px] font-medium"}`}
+        className={`text-white/86 dark:text-white/55 ${collapsed ? "self-center text-center text-[10px] font-medium [writing-mode:vertical-rl] rotate-180" : "pt-6 text-[11px] font-medium"}`}
       >
-        ©{currentYear} {appVersion}
+        ©{currentYear} {settings.companyName || settings.applicationName} {appVersion}
       </p>
     </>
   );
@@ -261,16 +282,14 @@ function SidebarGroup({
 
           const itemClassName =
             collapsed
-              ? `flex h-[54px] w-[54px] items-center justify-center rounded-[16px] transition ${
-                  active
-                    ? "bg-[#7692ff] text-white shadow-[0_8px_20px_rgba(118,146,255,0.34)] dark:bg-[rgba(99,102,241,0.22)] dark:text-[#a5b4fc] dark:shadow-[0_10px_24px_rgba(79,70,229,0.18)]"
-                    : "text-white/95 hover:bg-white/10 dark:text-white/72 dark:hover:bg-white/8"
-                }`
-              : `flex h-[40px] w-full items-center gap-3 rounded-[12px] px-4 text-[16px] font-medium transition ${
-                  active
-                    ? "bg-[#7692ff] text-white shadow-[0_8px_20px_rgba(118,146,255,0.34)] dark:bg-[rgba(99,102,241,0.22)] dark:text-[#c7d2fe] dark:shadow-[0_10px_24px_rgba(79,70,229,0.18)]"
-                    : "text-white/92 hover:bg-white/10 dark:text-white/78 dark:hover:bg-white/8"
-                }`;
+              ? `flex h-[54px] w-[54px] items-center justify-center rounded-[16px] transition ${active
+                ? "bg-[#7692ff] text-white shadow-[0_8px_20px_rgba(118,146,255,0.34)] dark:bg-[rgba(99,102,241,0.22)] dark:text-[#a5b4fc] dark:shadow-[0_10px_24px_rgba(79,70,229,0.18)]"
+                : "text-white/95 hover:bg-white/10 dark:text-white/72 dark:hover:bg-white/8"
+              }`
+              : `flex h-[40px] w-full items-center gap-3 rounded-[12px] px-4 text-[16px] font-medium transition ${active
+                ? "bg-[#7692ff] text-white shadow-[0_8px_20px_rgba(118,146,255,0.34)] dark:bg-[rgba(99,102,241,0.22)] dark:text-[#c7d2fe] dark:shadow-[0_10px_24px_rgba(79,70,229,0.18)]"
+                : "text-white/92 hover:bg-white/10 dark:text-white/78 dark:hover:bg-white/8"
+              }`;
 
           if (isLogout) {
             return (
