@@ -1,6 +1,9 @@
 import type { PassengerDto } from "./passenger.dto";
 
 export interface CreateFlightTicketDto {
+  provider?: string | null;
+  status?: "DRAFT" | "GENERATED";
+  templateId?: string | null;
   pnr?: string | null;
   ticketNumber?: string | null;
   airline?: string | null;

@@ -76,3 +76,9 @@ export async function uploadToMinio(params: {
     url: `${config.publicUrl}/${bucket}/${objectName}`,
   };
 }
+
+export async function removeFromMinio(objectName: string) {
+  const client = getMinioClient();
+  const bucket = await ensureMinioBucket();
+  await client.removeObject(bucket, objectName);
+}

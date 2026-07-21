@@ -22,6 +22,11 @@ enum TemplateType {
   FLIGHT_TICKET
 }
 
+enum DocumentStatus {
+  DRAFT
+  GENERATED
+}
+
 enum VesselType {
   CREWING_TANKER
   CMOS
@@ -62,6 +67,7 @@ model Template {
   isDefault   Boolean      @default(false)
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
+  flightTickets FlightTicket[]
 }
 
 model Vessel {
@@ -124,6 +130,14 @@ model InvoiceItem {
 
 model FlightTicket {
   id                String      @id @default(cuid())
+  functionCategory  VesselType?
+  assign            String?
+  serviceMode       String?
+  bookingReference  String?     @unique
+  provider          String?
+  status            DocumentStatus @default(DRAFT)
+  templateId        String?
+  template          Template?   @relation(fields: [templateId], references: [id], onDelete: SetNull)
   pnr               String?
   ticketNumber      String?
   airline           String?
@@ -141,6 +155,8 @@ model FlightTicket {
   duration          String?
   currency          String? @default("IDR")
   fare              Decimal?     @db.Decimal(18, 2)
+  farePerPax        Decimal?     @db.Decimal(18, 2)
+  quantity          Int?         @default(1)
   tax               Decimal?     @db.Decimal(18, 2)
   grandTotal        Decimal?     @db.Decimal(18, 2)
   originalFileName  String
@@ -151,6 +167,8 @@ model FlightTicket {
   passengers        Passenger[]
   @@index([pnr])
   @@index([departureDate])
+  @@index([provider])
+  @@index([status])
 }
 
 model Passenger {

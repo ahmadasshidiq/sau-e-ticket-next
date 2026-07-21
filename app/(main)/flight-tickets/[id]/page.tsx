@@ -1,0 +1,609 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import {
+  ArrowLeft02Icon,
+  AiContentGenerator01Icon,
+  Delete02Icon,
+  Loading03Icon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { DashboardShell } from "@/components/dashboard-shell";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { toast } from "@/lib/toast";
+import { SelectField } from "@/components/select-field";
+
+type Passenger = {
+  id?: string;
+  title?: string | null;
+  name: string;
+  passengerType?: string | null;
+  baggage?: string | null;
+  ticketNumber?: string | null;
+};
+
+type FlightTicketDetail = {
+  id: string;
+  functionCategory: "CREWING_TANKER" | "CMOS" | "TAD" | null;
+  assign: "Sign On" | "Sign Off" | null;
+  serviceMode: "Flight" | "Train" | "Bus" | null;
+  bookingReference: string | null;
+  provider: string | null;
+  status: "DRAFT" | "GENERATED";
+  pnr: string | null;
+  ticketNumber: string | null;
+  airline: string | null;
+  flightNumber: string | null;
+  cabinClass: string | null;
+  departureAirport: string | null;
+  arrivalAirport: string | null;
+  departureTerminal: string | null;
+  departureGate: string | null;
+  departureDate: string | null;
+  arrivalDate: string | null;
+  departureTime: string | null;
+  arrivalTime: string | null;
+  duration: string | null;
+  farePerPax: string | null;
+  quantity: number;
+  grandTotal: string | null;
+  passengers: Passenger[];
+};
+
+const emptyPassenger: Passenger = {
+  title: "",
+  name: "",
+  passengerType: "",
+  baggage: "",
+  ticketNumber: "",
+};
+
+const fieldClassName = "h-[46px] rounded-[14px] border-[#d1d5db] bg-white px-4 text-[14px] text-[#111827] placeholder:text-[#9ca3af] focus-visible:border-[#4438ff] focus-visible:ring-[color:rgba(68,56,255,0.12)] dark:border-white/10 dark:bg-[#151d2c] dark:text-white dark:placeholder:text-[#64748b]";
+
+const sectionClassName =
+  "rounded-[28px] border border-[#e5e7eb] bg-white p-6 dark:border-white/10 dark:bg-[#111827]";
+
+function parseCurrencyInput(value: string | null | undefined) {
+  if (!value) {
+    return "";
+  }
+
+  return value.replace(/[^\d]/g, "");
+}
+
+function formatCurrencyInput(value: string | null | undefined) {
+  const digits = parseCurrencyInput(value);
+  if (!digits) {
+    return "";
+  }
+
+  return new Intl.NumberFormat("id-ID").format(Number(digits));
+}
+
+export default function ValidateFlightTicketPage() {
+  const params = useParams<{ id: string }>();
+  const router = useRouter();
+  const [ticket, setTicket] = useState<FlightTicketDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [generating, setGenerating] = useState(false);
+
+  useEffect(() => {
+    if (!params.id) {
+      return;
+    }
+
+    fetch(`/api/flight-tickets/${params.id}`)
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Failed to load flight ticket.");
+        }
+
+        return response.json();
+      })
+      .then((result) => {
+        setTicket(result);
+      })
+      .catch((error: unknown) => {
+        toast({
+          title: "Failed to load ticket",
+          description:
+            error instanceof Error ? error.message : "Unknown error occurred.",
+          variant: "destructive",
+        });
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [params.id]);
+
+  useEffect(() => {
+    setTicket((current) => {
+      if (!current) {
+        return current;
+      }
+
+      const farePerPax = Number(parseCurrencyInput(current.farePerPax));
+      const quantity = Number(current.quantity ?? 0);
+
+      if (!farePerPax || !quantity) {
+        if (!current.grandTotal) {
+          return current;
+        }
+
+        return {
+          ...current,
+          grandTotal: null,
+        };
+      }
+
+      const computedGrandTotal = String(farePerPax * quantity);
+      if (current.grandTotal === computedGrandTotal) {
+        return current;
+      }
+
+      return {
+        ...current,
+        grandTotal: computedGrandTotal,
+      };
+    });
+  }, [ticket?.farePerPax, ticket?.quantity]);
+
+  function updateField<Key extends keyof FlightTicketDetail>(
+    key: Key,
+    value: FlightTicketDetail[Key]
+  ) {
+    setTicket((current) => (current ? { ...current, [key]: value } : current));
+  }
+
+  function updatePassenger(index: number, key: keyof Passenger, value: string) {
+    setTicket((current) => {
+      if (!current) return current;
+
+      const nextPassengers = [...current.passengers];
+      nextPassengers[index] = {
+        ...nextPassengers[index],
+        [key]: value,
+      };
+
+      return {
+        ...current,
+        passengers: nextPassengers,
+      };
+    });
+  }
+
+  function removePassenger(index: number) {
+    setTicket((current) => {
+      if (!current) return current;
+
+      if (current.passengers.length <= 1) {
+        return current;
+      }
+
+      return {
+        ...current,
+        passengers: current.passengers.filter((_, passengerIndex) => passengerIndex !== index),
+      };
+    });
+  }
+
+  async function saveDraft() {
+    if (!ticket) return null;
+
+    setSaving(true);
+
+    try {
+      const response = await fetch(`/api/flight-tickets/${ticket.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ...ticket,
+          status: "DRAFT",
+        }),
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.message ?? "Failed to save flight ticket.");
+      }
+
+      setTicket(result);
+      toast({
+        title: "Draft saved",
+        description: "Flight ticket draft has been updated.",
+        variant: "success",
+      });
+
+      return result as FlightTicketDetail;
+    } catch (error) {
+      toast({
+        title: "Save failed",
+        description:
+          error instanceof Error ? error.message : "Unknown error occurred.",
+        variant: "destructive",
+      });
+
+      return null;
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function generateDocument() {
+    if (!ticket) return;
+
+    setGenerating(true);
+
+    try {
+      const savedTicket = await saveDraft();
+      if (!savedTicket) {
+        return;
+      }
+
+      const printWindow = window.open(
+        `/api/flight-tickets/${savedTicket.id}/generate`,
+        "_blank",
+        "noopener,noreferrer"
+      );
+
+      if (!printWindow) {
+        throw new Error("Popup blocked. Please allow popups for this site.");
+      }
+
+      toast({
+        title: "Document generated",
+        description: "Print preview opened. Save it as PDF from the print dialog.",
+        variant: "success",
+      });
+
+      router.refresh();
+    } catch (error) {
+      toast({
+        title: "Generate failed",
+        description:
+          error instanceof Error ? error.message : "Unknown error occurred.",
+        variant: "destructive",
+      });
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  return (
+    <DashboardShell
+      title="Validate Flight Ticket Data"
+      description="Review and edit OCR results before generating the final ticket document."
+    >
+      <div className="min-w-0 w-full max-w-[1320px] space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <span className="inline-flex rounded-full bg-[#fff3e4] px-4 py-2 text-sm font-semibold text-[#f58a07] dark:bg-[#3a2a14] dark:text-[#ffbf66]">
+            {ticket?.status ?? "DRAFT"} Document
+          </span>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              className="h-[42px] rounded-[10px] border-[#d1d5db] px-5 text-[15px] text-[#374151] dark:border-white/10 dark:bg-[#111827] dark:text-[#d1d5db]"
+              onClick={() => router.push("/flight-tickets")}
+            >
+              <HugeiconsIcon icon={ArrowLeft02Icon} size={22} strokeWidth={2} />
+              Back
+            </Button>
+            <Button
+              className="h-[42px] rounded-[10px] bg-[#15A726] px-5 text-[15px] text-white hover:bg-[#3CE550]"
+              onClick={() => void saveDraft()}
+              disabled={saving}
+            >
+              {saving ? (
+                <>
+                  <HugeiconsIcon icon={Loading03Icon} size={18} className="animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save Draft"
+              )}
+            </Button>
+            <Button
+              className="h-[42px] rounded-[10px] bg-[#4b44f5] px-5 text-[15px] text-white hover:bg-[#3f39dc]"
+              onClick={() => void generateDocument()}
+              disabled={generating || loading || !ticket}
+            >
+              {generating ? (
+                <>
+                  <HugeiconsIcon icon={Loading03Icon} size={18} className="animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <HugeiconsIcon icon={AiContentGenerator01Icon} size={18} strokeWidth={1.8} />
+                  Generate Document
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+
+        {loading || !ticket ? (
+          <div className={`${sectionClassName} px-8 py-16 text-center text-sm text-[#8b8b8b] dark:text-[#94a3b8]`}>
+            Loading flight ticket data...
+          </div>
+        ) : (
+          <div className="space-y-6">
+            <section className={sectionClassName}>
+              <div className="mb-5">
+                <h2 className="text-lg font-semibold text-[#111827] dark:text-white">Category Selection</h2>
+                <p className="mt-1 text-sm text-[#6b7280] dark:text-[#94a3b8]">
+                  Complete the required category fields before validating the rest of the ticket data.
+                </p>
+              </div>
+              <div className="grid gap-5 xl:grid-cols-4">
+                <SelectField
+                  label="Fungsi"
+                  value={ticket.functionCategory ?? ""}
+                  onChange={(value) =>
+                    updateField(
+                      "functionCategory",
+                      (value || null) as FlightTicketDetail["functionCategory"]
+                    )
+                  }
+                  options={[
+                    { label: "Crewing Tanker", value: "CREWING_TANKER" },
+                    { label: "CMOS", value: "CMOS" },
+                    { label: "TAD", value: "TAD" },
+                  ]}
+                />
+                <SelectField
+                  label="Assign"
+                  value={ticket.assign ?? ""}
+                  onChange={(value) =>
+                    updateField("assign", (value || null) as FlightTicketDetail["assign"])
+                  }
+                  options={[
+                    { label: "Sign On", value: "Sign On" },
+                    { label: "Sign Off", value: "Sign Off" },
+                  ]}
+                />
+                <SelectField
+                  label="Service Mode"
+                  value={ticket.serviceMode ?? ""}
+                  onChange={(value) =>
+                    updateField(
+                      "serviceMode",
+                      (value || null) as FlightTicketDetail["serviceMode"]
+                    )
+                  }
+                  options={[
+                    { label: "Flight", value: "Flight" },
+                    { label: "Train", value: "Train" },
+                    { label: "Bus", value: "Bus" },
+                  ]}
+                />
+                <Field
+                  label="Booking Reference"
+                  value={ticket.bookingReference}
+                  onChange={(value) => updateField("bookingReference", value)}
+                />
+              </div>
+            </section>
+
+            <section className={sectionClassName}>
+              <div className="mb-5">
+                <h2 className="text-lg font-semibold text-[#111827] dark:text-white">Ticketing Data</h2>
+                <p className="mt-1 text-sm text-[#6b7280] dark:text-[#94a3b8]">
+                  Review the OCR result and adjust any fields that still need correction.
+                </p>
+              </div>
+              <div className="grid gap-5 xl:grid-cols-4">
+                <Field label="PNR / Booking Code" value={ticket.pnr} onChange={(value) => updateField("pnr", value)} />
+                <Field label="Provider" value={ticket.provider} onChange={(value) => updateField("provider", value)} />
+                <Field label="Ticket ID" value={ticket.id} onChange={() => undefined} readOnly />
+                <Field label="Ticket Number" value={ticket.ticketNumber} onChange={(value) => updateField("ticketNumber", value)} />
+                <Field label="Airline" value={ticket.airline} onChange={(value) => updateField("airline", value)} />
+                <Field label="Flight Number" value={ticket.flightNumber} onChange={(value) => updateField("flightNumber", value)} />
+                <Field label="Cabin Class" value={ticket.cabinClass} onChange={(value) => updateField("cabinClass", value)} />
+                <Field label="Departure Date" type="date" value={ticket.departureDate ? ticket.departureDate.slice(0, 10) : ""} onChange={(value) => updateField("departureDate", value || null)} />
+                <Field label="Departure Time" value={ticket.departureTime} onChange={(value) => updateField("departureTime", value)} />
+                <Field label="Departure Airport" value={ticket.departureAirport} onChange={(value) => updateField("departureAirport", value)} />
+                <Field label="Departure Terminal" value={ticket.departureTerminal} onChange={(value) => updateField("departureTerminal", value)} />
+                <Field label="Arrival Date" type="date" value={ticket.arrivalDate ? ticket.arrivalDate.slice(0, 10) : ""} onChange={(value) => updateField("arrivalDate", value || null)} />
+                <Field label="Arrival Time" value={ticket.arrivalTime} onChange={(value) => updateField("arrivalTime", value)} />
+                <Field label="Arrival Airport" value={ticket.arrivalAirport} onChange={(value) => updateField("arrivalAirport", value)} />
+                <Field label="Duration" value={ticket.duration} onChange={(value) => updateField("duration", value)} />
+                <Field label="Departure Gate" value={ticket.departureGate} onChange={(value) => updateField("departureGate", value)} />
+              </div>
+            </section>
+
+            <section className={sectionClassName}>
+              <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-[#111827] dark:text-white">Passenger Detail</h2>
+                  <p className="mt-1 text-sm text-[#6b7280] dark:text-[#94a3b8]">
+                    Review title, passenger name, ticket number, passenger type, and checked baggage for each passenger.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-[44px] rounded-[14px] border-[#d1d5db] px-4 text-[14px] text-[#374151] dark:border-white/10 dark:bg-[#111827] dark:text-[#d1d5db]"
+                  onClick={() =>
+                    setTicket((current) =>
+                      current
+                        ? {
+                          ...current,
+                          passengers: [...current.passengers, { ...emptyPassenger }],
+                        }
+                        : current
+                    )
+                  }
+                >
+                  Add Passenger
+                </Button>
+              </div>
+
+              <div className="space-y-4">
+                {ticket.passengers.map((passenger, index) => (
+                  <div
+                    key={passenger.id ?? index}
+                    className="rounded-[20px] border border-[#edf0f7] bg-[#fafcff] p-5 dark:border-white/10 dark:bg-[#151d2c]"
+                  >
+                    <div className="mb-4 flex items-center justify-between gap-3">
+                      <span className="text-sm font-medium text-[#6b7280] dark:text-[#94a3b8]">
+                        Passenger {index + 1}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => removePassenger(index)}
+                        disabled={ticket.passengers.length <= 1}
+                        className="text-[#dc2626] hover:bg-[#fef2f2] hover:text-[#dc2626] disabled:opacity-40 dark:text-red-300 dark:hover:bg-red-500/10 dark:hover:text-red-200"
+                      >
+                        <HugeiconsIcon icon={Delete02Icon} size={18} strokeWidth={1.8} />
+                      </Button>
+                    </div>
+                    <div className="grid gap-5 xl:grid-cols-12">
+                      <div className="xl:col-span-2">
+                        <SelectField
+                          label="Title"
+                          value={passenger.title ?? ""}
+                          onChange={(value) => updatePassenger(index, "title", value)}
+                          options={[
+                            { label: "Mr.", value: "Mr." },
+                            { label: "Mrs.", value: "Mrs." },
+                            { label: "Ms.", value: "Ms." },
+                          ]}
+                        />
+                      </div>
+                      <div className="xl:col-span-3">
+                        <Field
+                          label="Passenger Name"
+                          value={passenger.name}
+                          onChange={(value) => updatePassenger(index, "name", value)}
+                        />
+                      </div>
+                      <div className="xl:col-span-2">
+                        <Field
+                          label="Ticket Number"
+                          value={passenger.ticketNumber}
+                          onChange={(value) => updatePassenger(index, "ticketNumber", value)}
+                        />
+                      </div>
+                      <div className="xl:col-span-3">
+                        <SelectField
+                          label="Passenger Type"
+                          value={passenger.passengerType ?? ""}
+                          onChange={(value) => updatePassenger(index, "passengerType", value)}
+                          options={[
+                            { label: "Adult", value: "Adult" },
+                            { label: "Child", value: "Child" },
+                            { label: "Infant", value: "Infant" },
+                          ]}
+                        />
+                      </div>
+                      <div className="xl:col-span-2">
+                        <Field
+                          label="Checked Baggage"
+                          value={passenger.baggage}
+                          onChange={(value) => updatePassenger(index, "baggage", value)}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className={sectionClassName}>
+              <div className="mb-5">
+                <h2 className="text-lg font-semibold text-[#111827] dark:text-white">Fare Detail</h2>
+                <p className="mt-1 text-sm text-[#6b7280] dark:text-[#94a3b8]">
+                  Confirm fare per passenger, quantity, and grand total before generating the document.
+                </p>
+              </div>
+              <div className="grid gap-5 xl:grid-cols-3">
+                <CurrencyField
+                  label="Fare per Pax"
+                  value={ticket.farePerPax}
+                  onChange={(value) => updateField("farePerPax", value)}
+                />
+                <Field
+                  label="Quantity"
+                  value={String(ticket.quantity ?? 1)}
+                  onChange={(value) =>
+                    updateField("quantity", Number(value || "0") || 0)
+                  }
+                  type="number"
+                />
+                <CurrencyField
+                  label="Grand Total"
+                  value={ticket.grandTotal}
+                  onChange={(value) => updateField("grandTotal", value)}
+                  readOnly
+                />
+              </div>
+            </section>
+          </div>
+        )}
+      </div>
+    </DashboardShell>
+  );
+}
+
+function CurrencyField({
+  label,
+  value,
+  onChange,
+  readOnly = false,
+}: {
+  label: string;
+  value: string | null | undefined;
+  onChange: (value: string) => void;
+  readOnly?: boolean;
+}) {
+  return (
+    <div className="space-y-2.5">
+      <Label className="text-[14px] font-medium text-[#374151] dark:text-[#d1d5db]">{label}</Label>
+      <Input
+        type="text"
+        inputMode="numeric"
+        value={formatCurrencyInput(value)}
+        onChange={(event) => onChange(parseCurrencyInput(event.target.value))}
+        readOnly={readOnly}
+        className={readOnly ? `${fieldClassName} bg-[#f8fafc] text-[#6b7280] dark:bg-[#0f172a] dark:text-[#94a3b8]` : fieldClassName}
+      />
+    </div>
+  );
+}
+
+function Field({
+  label,
+  value,
+  onChange,
+  type = "text",
+  readOnly = false,
+}: {
+  label: string;
+  value: string | null | undefined;
+  onChange: (value: string) => void;
+  type?: string;
+  readOnly?: boolean;
+}) {
+  return (
+    <div className="space-y-2.5">
+      <Label className="text-[14px] font-medium text-[#374151] dark:text-[#d1d5db]">{label}</Label>
+      <Input
+        type={type}
+        value={value ?? ""}
+        onChange={(event) => onChange(event.target.value)}
+        readOnly={readOnly}
+        className={readOnly ? `${fieldClassName} bg-[#f8fafc] text-[#6b7280] dark:bg-[#0f172a] dark:text-[#94a3b8]` : fieldClassName}
+      />
+    </div>
+  );
+}
