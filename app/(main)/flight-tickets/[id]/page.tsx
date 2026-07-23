@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/lib/toast";
 import { SelectField } from "@/components/select-field";
+import type { FlightOption } from "@/lib/flight-ticket/flight-options";
 
 type Passenger = {
   id?: string;
@@ -38,18 +39,22 @@ type FlightTicketDetail = {
   airline: string | null;
   flightNumber: string | null;
   cabinClass: string | null;
+  departureCity: string | null;
+  arrivalCity: string | null;
   departureAirport: string | null;
   arrivalAirport: string | null;
   departureTerminal: string | null;
-  departureGate: string | null;
   departureDate: string | null;
   arrivalDate: string | null;
   departureTime: string | null;
+  arrivalTerminal: string | null;
   arrivalTime: string | null;
   duration: string | null;
   farePerPax: string | null;
   quantity: number;
   grandTotal: string | null;
+  selectedFlightOptionKey: string | null;
+  flightOptions: FlightOption[];
   passengers: Passenger[];
 };
 
@@ -81,6 +86,44 @@ function formatCurrencyInput(value: string | null | undefined) {
   }
 
   return new Intl.NumberFormat("id-ID").format(Number(digits));
+}
+
+function computeGrandTotal(
+  farePerPax: string | null | undefined,
+  quantity: number | null | undefined
+) {
+  const normalizedFare = Number(parseCurrencyInput(farePerPax));
+  const normalizedQuantity = Number(quantity ?? 0);
+
+  if (!normalizedFare || !normalizedQuantity) {
+    return null;
+  }
+
+  return String(normalizedFare * normalizedQuantity);
+}
+
+function applyFlightOption(
+  ticket: FlightTicketDetail,
+  option: FlightOption
+): FlightTicketDetail {
+  return {
+    ...ticket,
+    selectedFlightOptionKey: option.key,
+    airline: option.airline ?? null,
+    flightNumber: option.flightNumber ?? null,
+    cabinClass: option.cabinClass ?? null,
+    departureCity: option.departureCity ?? null,
+    arrivalCity: option.arrivalCity ?? null,
+    departureAirport: option.departureAirport ?? null,
+    arrivalAirport: option.arrivalAirport ?? null,
+    departureTerminal: option.departureTerminal ?? null,
+    arrivalTerminal: option.arrivalTerminal ?? null,
+    departureDate: option.departureDate ?? null,
+    arrivalDate: option.arrivalDate ?? null,
+    departureTime: option.departureTime ?? null,
+    arrivalTime: option.arrivalTime ?? null,
+    duration: option.duration ?? null,
+  };
 }
 
 export default function ValidateFlightTicketPage() {
@@ -120,43 +163,30 @@ export default function ValidateFlightTicketPage() {
       });
   }, [params.id]);
 
-  useEffect(() => {
+  function updateField<Key extends keyof FlightTicketDetail>(
+    key: Key,
+    value: FlightTicketDetail[Key]
+  ) {
     setTicket((current) => {
       if (!current) {
         return current;
       }
 
-      const farePerPax = Number(parseCurrencyInput(current.farePerPax));
-      const quantity = Number(current.quantity ?? 0);
+      const nextTicket = { ...current, [key]: value };
 
-      if (!farePerPax || !quantity) {
-        if (!current.grandTotal) {
-          return current;
-        }
-
-        return {
-          ...current,
-          grandTotal: null,
-        };
+      if (key === "farePerPax" || key === "quantity") {
+        nextTicket.grandTotal = computeGrandTotal(
+          key === "farePerPax"
+            ? (value as FlightTicketDetail["farePerPax"])
+            : nextTicket.farePerPax,
+          key === "quantity"
+            ? (value as FlightTicketDetail["quantity"])
+            : nextTicket.quantity
+        );
       }
 
-      const computedGrandTotal = String(farePerPax * quantity);
-      if (current.grandTotal === computedGrandTotal) {
-        return current;
-      }
-
-      return {
-        ...current,
-        grandTotal: computedGrandTotal,
-      };
+      return nextTicket;
     });
-  }, [ticket?.farePerPax, ticket?.quantity]);
-
-  function updateField<Key extends keyof FlightTicketDetail>(
-    key: Key,
-    value: FlightTicketDetail[Key]
-  ) {
-    setTicket((current) => (current ? { ...current, [key]: value } : current));
   }
 
   function updatePassenger(index: number, key: keyof Passenger, value: string) {
@@ -278,7 +308,7 @@ export default function ValidateFlightTicketPage() {
   return (
     <DashboardShell
       title="Validate Flight Ticket Data"
-      description="Review and edit OCR results before generating the final ticket document."
+      description="Review and complete the flight ticket draft before generating the final document."
     >
       <div className="min-w-0 w-full max-w-[1320px] space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
@@ -396,7 +426,7 @@ export default function ValidateFlightTicketPage() {
               <div className="mb-5">
                 <h2 className="text-lg font-semibold text-[#111827] dark:text-white">Ticketing Data</h2>
                 <p className="mt-1 text-sm text-[#6b7280] dark:text-[#94a3b8]">
-                  Review the OCR result and adjust any fields that still need correction.
+                  Complete or revise the ticket fields based on the uploaded document.
                 </p>
               </div>
               <div className="grid gap-5 xl:grid-cols-4">
@@ -404,18 +434,47 @@ export default function ValidateFlightTicketPage() {
                 <Field label="Provider" value={ticket.provider} onChange={(value) => updateField("provider", value)} />
                 <Field label="Ticket ID" value={ticket.id} onChange={() => undefined} readOnly />
                 <Field label="Ticket Number" value={ticket.ticketNumber} onChange={(value) => updateField("ticketNumber", value)} />
+                {ticket.provider === "CUE_TRAVEL" && ticket.flightOptions.length > 1 ? (
+                  <SelectField
+                    label="Selected Flight"
+                    value={ticket.selectedFlightOptionKey ?? ticket.flightOptions[0]?.key ?? ""}
+                    onChange={(value) =>
+                      setTicket((current) => {
+                        if (!current) {
+                          return current;
+                        }
+
+                        const selectedOption = current.flightOptions.find(
+                          (option) => option.key === value
+                        );
+
+                        return selectedOption
+                          ? applyFlightOption(current, selectedOption)
+                          : {
+                              ...current,
+                              selectedFlightOptionKey: value || null,
+                            };
+                      })
+                    }
+                    options={ticket.flightOptions.map((option) => ({
+                      label: option.label,
+                      value: option.key,
+                    }))}
+                  />
+                ) : null}
                 <Field label="Airline" value={ticket.airline} onChange={(value) => updateField("airline", value)} />
                 <Field label="Flight Number" value={ticket.flightNumber} onChange={(value) => updateField("flightNumber", value)} />
                 <Field label="Cabin Class" value={ticket.cabinClass} onChange={(value) => updateField("cabinClass", value)} />
                 <Field label="Departure Date" type="date" value={ticket.departureDate ? ticket.departureDate.slice(0, 10) : ""} onChange={(value) => updateField("departureDate", value || null)} />
                 <Field label="Departure Time" value={ticket.departureTime} onChange={(value) => updateField("departureTime", value)} />
+                <Field label="Departure City" value={ticket.departureCity} onChange={(value) => updateField("departureCity", value)} />
                 <Field label="Departure Airport" value={ticket.departureAirport} onChange={(value) => updateField("departureAirport", value)} />
                 <Field label="Departure Terminal" value={ticket.departureTerminal} onChange={(value) => updateField("departureTerminal", value)} />
                 <Field label="Arrival Date" type="date" value={ticket.arrivalDate ? ticket.arrivalDate.slice(0, 10) : ""} onChange={(value) => updateField("arrivalDate", value || null)} />
                 <Field label="Arrival Time" value={ticket.arrivalTime} onChange={(value) => updateField("arrivalTime", value)} />
+                <Field label="Arrival City" value={ticket.arrivalCity} onChange={(value) => updateField("arrivalCity", value)} />
                 <Field label="Arrival Airport" value={ticket.arrivalAirport} onChange={(value) => updateField("arrivalAirport", value)} />
                 <Field label="Duration" value={ticket.duration} onChange={(value) => updateField("duration", value)} />
-                <Field label="Departure Gate" value={ticket.departureGate} onChange={(value) => updateField("departureGate", value)} />
               </div>
             </section>
 

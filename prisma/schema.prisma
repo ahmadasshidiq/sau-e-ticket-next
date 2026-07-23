@@ -143,6 +143,8 @@ model FlightTicket {
   airline           String?
   flightNumber      String?
   cabinClass        String?
+  departureCity     String?
+  arrivalCity       String?
   departureAirport  String?
   arrivalAirport    String?
   departureTerminal String?
@@ -159,6 +161,8 @@ model FlightTicket {
   quantity          Int?         @default(1)
   tax               Decimal?     @db.Decimal(18, 2)
   grandTotal        Decimal?     @db.Decimal(18, 2)
+  selectedFlightOptionKey String?
+  flightOptionsJson String?      @db.Text
   originalFileName  String
   objectKey         String
   rawText           String?      @db.Text

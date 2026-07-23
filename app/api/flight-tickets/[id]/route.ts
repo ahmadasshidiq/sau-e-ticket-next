@@ -73,6 +73,8 @@ export async function PATCH(
       airline: body.airline ?? null,
       flightNumber: body.flightNumber ?? null,
       cabinClass: body.cabinClass ?? null,
+      departureCity: body.departureCity ?? null,
+      arrivalCity: body.arrivalCity ?? null,
       departureAirport: body.departureAirport ?? null,
       arrivalAirport: body.arrivalAirport ?? null,
       departureTerminal: body.departureTerminal ?? null,
@@ -89,6 +91,10 @@ export async function PATCH(
       quantity: body.quantity ? Number(body.quantity) : 1,
       tax: parseDecimal(body.tax),
       grandTotal: parseDecimal(body.grandTotal),
+      selectedFlightOptionKey: body.selectedFlightOptionKey ?? null,
+      flightOptionsJson: Array.isArray(body.flightOptions)
+        ? JSON.stringify(body.flightOptions)
+        : null,
       rawText: body.rawText ?? null,
       passengers: {
         deleteMany: {},

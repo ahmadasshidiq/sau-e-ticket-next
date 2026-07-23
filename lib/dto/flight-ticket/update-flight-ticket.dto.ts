@@ -1,4 +1,5 @@
 import type { PassengerDto } from "./passenger.dto";
+import type { FlightOption } from "@/lib/flight-ticket/flight-options";
 
 export interface UpdateFlightTicketDto {
   provider?: string | null;
@@ -9,6 +10,8 @@ export interface UpdateFlightTicketDto {
   airline?: string | null;
   flightNumber?: string | null;
   cabinClass?: string | null;
+  departureCity?: string | null;
+  arrivalCity?: string | null;
   departureAirport?: string | null;
   arrivalAirport?: string | null;
   departureTerminal?: string | null;
@@ -23,6 +26,8 @@ export interface UpdateFlightTicketDto {
   fare?: string | number | null;
   tax?: string | number | null;
   grandTotal?: string | number | null;
+  selectedFlightOptionKey?: string | null;
+  flightOptions?: FlightOption[] | null;
   originalFileName?: string;
   objectKey?: string;
   rawText?: string | null;

@@ -16,10 +16,11 @@ type FlightTicketLike = {
   airline?: string | null;
   flightNumber?: string | null;
   cabinClass?: string | null;
+  departureCity?: string | null;
+  arrivalCity?: string | null;
   departureAirport?: string | null;
   arrivalAirport?: string | null;
   departureTerminal?: string | null;
-  departureGate?: string | null;
   departureDate?: Date | string | null;
   arrivalDate?: Date | string | null;
   departureTime?: string | null;
@@ -182,13 +183,27 @@ function renderAirlineBrandMarkup(airline: string | null | undefined) {
   const airlineName = sanitize(airline);
   const normalized = airlineName.toLowerCase();
 
-  const logoSrc = normalized.includes("garuda")
-    ? "/img/maskapai-garuda.png"
-    : normalized.includes("batik")
-      ? "/img/maskapai-batik-air.png"
-      : normalized.includes("citilink")
-        ? "/img/maskapai-citilink.png"
-        : null;
+  const logoSrc = normalized.includes("batik")
+    ? "/img/maskapai-batik-air.png"
+    : normalized.includes("lion air")
+      ? "/img/maskapai-lion-air.png"
+      : normalized.includes("pelita")
+        ? "/img/maskapai-pelita-air.png"
+        : normalized.includes("garuda")
+          ? "/img/maskapai-garuda.png"
+          : normalized.includes("citilink")
+            ? "/img/maskapai-citilink.png"
+            : normalized.includes("super air jet")
+              ? "/img/maskapai-super-air-jet.png"
+              : normalized.includes("airasia") || normalized.includes("air asia")
+                ? "/img/maskapai-air-asia.png"
+                : normalized.includes("wings air")
+                  ? "/img/maskapai-wings-air.png"
+                  : normalized.includes("transnusa") || normalized.includes("trans nusa")
+                    ? "/img/maskapai-trans-nusa.png"
+                    : normalized === "kai" || normalized.includes("kereta api indonesia")
+                      ? "/img/maskapai-kai.png"
+                      : null;
 
   if (!logoSrc) {
     return `<span class="airline-logo-text">${escapeHtml(airlineName)}</span>`;
@@ -219,6 +234,8 @@ export function renderFlightTicketHtml(ticket: FlightTicketLike) {
   const arrival = splitAirport(ticket.arrivalAirport);
   const departureDisplay = formatAirportDisplay(ticket.departureAirport);
   const arrivalDisplay = formatAirportDisplay(ticket.arrivalAirport);
+  const departureCityDisplay = splitAirport(ticket.departureCity);
+  const arrivalCityDisplay = splitAirport(ticket.arrivalCity);
   const duration = parseDuration(ticket.duration);
   const departureDate = formatDate(ticket.departureDate, {
     day: "2-digit",
@@ -920,13 +937,25 @@ export function renderFlightTicketHtml(ticket: FlightTicketLike) {
                             <div style="font-size:20px; color:${"var(--brand-blue)"}; font-weight:700; margin-top:2px;">${escapeHtml(departureDate)}</div>
                         </div>
                         <div class="time" style="justify-content:flex-start; margin-top:4px;">${escapeHtml(departureTime)}</div>
-                        <div class="airport">${escapeHtml(departureDisplay.title.toUpperCase())}${
-                            departureDisplay.code ? ` (${escapeHtml(departureDisplay.code.toUpperCase())})` : ""
-                            }</div>
-                        <div class="airport-full">${escapeHtml(departureDisplay.detail).toUpperCase()} AIRPORT</div>
-                        <div class="terminal">Terminal : ${escapeHtml(
-                            ticket.departureTerminal
-                            )}&nbsp;&nbsp;&nbsp;&nbsp;[Gate: ${escapeHtml(ticket.departureGate)}]</div>
+                        <div class="airport">${escapeHtml(departureCityDisplay.city.toUpperCase())}${
+                            departureCityDisplay.code ? ` (${escapeHtml(departureCityDisplay.code.toUpperCase())})` : ""
+                        }</div>
+                        <div class="airport-full">
+                          ${(() => {
+                            const detail = escapeHtml(departureDisplay.detail).trim();
+                            return /airport$/i.test(detail)
+                              ? detail.toUpperCase()
+                              : `${detail.toUpperCase()} AIRPORT`;
+                          })()}
+                        </div>
+                        <div class="terminal">
+                          ${(() => {
+                            const terminal = escapeHtml(ticket.departureTerminal).trim();
+                            return /terminal/i.test(terminal)
+                              ? terminal
+                              : `Terminal ${terminal}`;
+                          })()}
+                        </div>
                     </div>
 
                     <div class="duration" style="margin-top: 3.5rem">
@@ -945,10 +974,17 @@ export function renderFlightTicketHtml(ticket: FlightTicketLike) {
                             <div style="font-size:20px; color:${"var(--brand-blue)"}; font-weight:700;">${escapeHtml(arrivalDate)}</div>
                         </div>
                         <div class="time" style="justify-content:flex-end; margin-top:4px;">${escapeHtml(arrivalTime)}</div>
-                        <div class="airport">${escapeHtml(arrivalDisplay.title.toUpperCase())}${
-                            arrivalDisplay.code ? ` (${escapeHtml(arrivalDisplay.code.toUpperCase())})` : ""
-                            }</div>
-                        <div class="airport-full">${escapeHtml(arrivalDisplay.detail).toUpperCase()} AIRPORT</div>
+                        <div class="airport">${escapeHtml(arrivalCityDisplay.city.toUpperCase())}${
+                            arrivalCityDisplay.code ? ` (${escapeHtml(arrivalCityDisplay.code.toUpperCase())})` : ""
+                        }</div>
+                        <div class="airport-full">
+                          ${(() => {
+                            const detail = escapeHtml(arrivalDisplay.detail).trim();
+                            return /airport$/i.test(detail)
+                              ? detail.toUpperCase()
+                              : `${detail.toUpperCase()} AIRPORT`;
+                          })()}
+                        </div>
                     </div>
                 </div>
             </div>

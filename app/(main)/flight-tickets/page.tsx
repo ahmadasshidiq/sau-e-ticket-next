@@ -43,6 +43,8 @@ type FlightTicketRecord = {
   templateName: string | null;
   pnr: string | null;
   airline: string | null;
+  departureCity: string | null;
+  arrivalCity: string | null;
   departureDate: string | null;
   grandTotal: string | null;
   createdAt: string;
@@ -55,6 +57,31 @@ type FlightTicketRow = FlightTicketRecord & {
   departureDateDisplay: string;
   createdAtDisplay: string;
 };
+
+function truncateWords(value: unknown, maxWords = 3) {
+  const text = String(value ?? "-").trim();
+  if (!text || text === "-") {
+    return "-";
+  }
+
+  const words = text.split(/\s+/);
+  if (words.length <= maxWords) {
+    return text;
+  }
+
+  return `${words.slice(0, maxWords).join(" ")}...`;
+}
+
+function renderTruncatedCell(value: unknown, maxWords = 3) {
+  const fullText = String(value ?? "-");
+  const shortText = truncateWords(value, maxWords);
+
+  return (
+    <span className="block truncate" title={fullText}>
+      {shortText}
+    </span>
+  );
+}
 
 const CATEGORY_OPTIONS = [
   { label: "Crewing Tanker", value: "CREWING_TANKER" },
@@ -125,11 +152,11 @@ export default function FlightTicketsPage() {
     }
   }
 
-  async function handleScanDocument() {
+  async function handleUploadDocument() {
     if (!selectedFile) {
       toast({
         title: "Document required",
-        description: "Choose a flight ticket file before scanning.",
+        description: "Choose a flight ticket file before uploading.",
         variant: "destructive",
       });
       return;
@@ -153,7 +180,7 @@ export default function FlightTicketsPage() {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.message ?? "Failed to scan document.");
+        throw new Error(result.message ?? "Failed to upload document.");
       }
 
       setShowModal(false);
@@ -166,7 +193,7 @@ export default function FlightTicketsPage() {
       router.push(`/flight-tickets/${result.id}`);
     } catch (error) {
       toast({
-        title: "Scan failed",
+        title: "Upload failed",
         description:
           error instanceof Error ? error.message : "Unknown error occurred.",
         variant: "destructive",
@@ -286,8 +313,22 @@ export default function FlightTicketsPage() {
         key: "airline",
         title: "Airline",
         widthClassName: "w-[170px]",
-        textClassName: "whitespace-normal break-words",
-        formatter: (value: unknown) => String(value ?? "-"),
+        textClassName: "max-w-[170px]",
+        formatter: (value: unknown) => renderTruncatedCell(value, 3),
+      },
+      {
+        key: "departureCity",
+        title: "Departure City",
+        widthClassName: "w-[150px]",
+        textClassName: "max-w-[150px]",
+        formatter: (value: unknown) => renderTruncatedCell(value, 3),
+      },
+      {
+        key: "arrivalCity",
+        title: "Arrival City",
+        widthClassName: "w-[150px]",
+        textClassName: "max-w-[150px]",
+        formatter: (value: unknown) => renderTruncatedCell(value, 3),
       },
       {
         key: "departureDateDisplay",
@@ -319,7 +360,8 @@ export default function FlightTicketsPage() {
         key: "templateDisplay",
         title: "Template",
         widthClassName: "w-[180px]",
-        textClassName: "whitespace-normal break-words leading-6",
+        textClassName: "max-w-[180px]",
+        formatter: (value: unknown) => renderTruncatedCell(value, 3),
       },
       {
         key: "createdAtDisplay",
@@ -434,10 +476,10 @@ export default function FlightTicketsPage() {
             <div className="overflow-hidden rounded-[28px]">
               <div className="border-b border-[#ebedf3] px-10 py-8 dark:border-white/10">
                 <h2 className="text-[22px] font-bold text-[#111827] dark:text-white">
-                  Upload &amp; Scan Flight Ticket
+                  Upload Flight Ticket
                 </h2>
                 <p className="mt-2 text-sm text-[#7b7b86] dark:text-[#94a3b8]">
-                  Upload your flight ticket document and choose the provider template for mapping.
+                  Upload your flight ticket document to create a draft. Ticket details will be filled manually or from the next extraction flow.
                 </p>
               </div>
 
@@ -541,7 +583,7 @@ export default function FlightTicketsPage() {
                       items={FLIGHT_TICKET_PROVIDERS}
                     >
                       <SelectTrigger className="h-[42px] rounded-[14px] border-[#d1d5db] bg-white px-5 text-[15px] text-[#111827] dark:border-white/10 dark:bg-[#151d2c] dark:text-white">
-                        <SelectValue placeholder="Select your template" />
+                        <SelectValue placeholder="Select provider/vendor" />
                         <SelectIcon />
                       </SelectTrigger>
                       <SelectPortal>
@@ -575,7 +617,7 @@ export default function FlightTicketsPage() {
                       Drag and drop file here or choose file
                     </p>
                     <p className="text-sm text-[#8b8fa4] dark:text-[#94a3b8]">
-                      Support formats: pdf, jpeg, jpg, png
+                      Supported format: PDF only (photos or screenshots of results are not accepted).
                     </p>
                     {selectedFile ? (
                       <p className="mt-4 rounded-full bg-white px-4 py-2 text-xs font-semibold text-[#111827] dark:bg-[#111827] dark:text-white">
@@ -610,16 +652,16 @@ export default function FlightTicketsPage() {
                   </Button>
                   <Button
                     className="h-[44px] rounded-[14px] bg-[#4b44f5] px-6 text-[14px] text-white hover:bg-[#3f39dc]"
-                    onClick={() => void handleScanDocument()}
+                    onClick={() => void handleUploadDocument()}
                     disabled={uploading}
                   >
                     {uploading ? (
                       <>
                         <HugeiconsIcon icon={Loading03Icon} size={18} className="animate-spin" />
-                        Scanning...
+                        Uploading...
                       </>
                     ) : (
-                      "Scan Document"
+                      "Upload Document"
                     )}
                   </Button>
                 </div>

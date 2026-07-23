@@ -1,4 +1,5 @@
 import type { FlightTicket, Passenger } from "@prisma/client";
+import type { FlightOption } from "@/lib/flight-ticket/flight-options";
 
 type FlightTicketWithPassengers = FlightTicket & {
   passengers: Passenger[];
@@ -9,6 +10,16 @@ type FlightTicketWithPassengers = FlightTicket & {
 };
 
 export function serializeFlightTicket(ticket: FlightTicketWithPassengers) {
+  let flightOptions: FlightOption[] = [];
+
+  try {
+    flightOptions = ticket.flightOptionsJson
+      ? (JSON.parse(ticket.flightOptionsJson) as FlightOption[])
+      : [];
+  } catch {
+    flightOptions = [];
+  }
+
   return {
     id: ticket.id,
     functionCategory: ticket.functionCategory,
@@ -24,6 +35,8 @@ export function serializeFlightTicket(ticket: FlightTicketWithPassengers) {
     airline: ticket.airline,
     flightNumber: ticket.flightNumber,
     cabinClass: ticket.cabinClass,
+    departureCity: ticket.departureCity,
+    arrivalCity: ticket.arrivalCity,
     departureAirport: ticket.departureAirport,
     arrivalAirport: ticket.arrivalAirport,
     departureTerminal: ticket.departureTerminal,
@@ -40,6 +53,8 @@ export function serializeFlightTicket(ticket: FlightTicketWithPassengers) {
     quantity: ticket.quantity ?? 1,
     tax: ticket.tax?.toString() ?? null,
     grandTotal: ticket.grandTotal?.toString() ?? null,
+    selectedFlightOptionKey: ticket.selectedFlightOptionKey,
+    flightOptions,
     originalFileName: ticket.originalFileName,
     objectKey: ticket.objectKey,
     rawText: ticket.rawText,

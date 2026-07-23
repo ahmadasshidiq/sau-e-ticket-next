@@ -1,13 +1,10 @@
 import { NextResponse } from "next/server";
 import { TemplateType, VesselType } from "@prisma/client";
 import { assertApiSession } from "@/lib/auth";
-import { mapFlightTicketOcrToDraft } from "@/lib/flight-ticket/ocr-mapper";
+import { mapFlightTicketPdfToDraft } from "@/lib/flight-ticket/pdf-ticket-mapper";
 import { serializeFlightTicket } from "@/lib/flight-ticket/serializers";
 import { uploadToMinio } from "@/lib/minio";
 import { prisma } from "@/lib/prisma";
-
-const OCR_SERVICE_URL =
-  process.env.OCR_SERVICE_URL?.replace(/\/$/, "") ?? "http://127.0.0.1:8000";
 
 const FUNCTION_CATEGORY_VALUES = new Set(Object.values(VesselType));
 
@@ -73,42 +70,12 @@ export async function POST(request: Request) {
     contentType: file.type || "application/octet-stream",
     buffer,
   });
+  const mapped = await mapFlightTicketPdfToDraft(provider, buffer, {
+    provider,
+    originalFileName: file.name,
+    objectKey: uploaded.objectName,
+  });
 
-  const ocrPayload = new FormData();
-  ocrPayload.append(
-    "file",
-    new Blob([buffer], { type: file.type || "application/octet-stream" }),
-    file.name
-  );
-
-  let ocrResponse: Response;
-
-  try {
-    ocrResponse = await fetch(`${OCR_SERVICE_URL}/ocr`, {
-      method: "POST",
-      body: ocrPayload,
-    });
-  } catch (error) {
-    return NextResponse.json(
-      {
-        message:
-          error instanceof Error
-            ? error.message
-            : "Unable to connect to OCR service.",
-      },
-      { status: 502 }
-    );
-  }
-
-  if (!ocrResponse.ok) {
-    const message = await ocrResponse.text();
-    return NextResponse.json(
-      { message: message || "OCR service failed to process the file." },
-      { status: 502 }
-    );
-  }
-
-  const ocrResult = await ocrResponse.json();
   const template = await prisma.template.findFirst({
     where: {
       type: TemplateType.FLIGHT_TICKET,
@@ -123,13 +90,6 @@ export async function POST(request: Request) {
       name: true,
     },
   });
-
-  const mapped = mapFlightTicketOcrToDraft(
-    provider,
-    ocrResult,
-    file.name,
-    uploaded.objectName
-  );
 
   const latestTicket = await prisma.flightTicket.findFirst({
     where: {
@@ -146,14 +106,6 @@ export async function POST(request: Request) {
   const nextBookingReferenceNumber = latestTicket?.bookingReference
     ? Number(latestTicket.bookingReference.replace(/[^\d]/g, "")) + 1
     : 1;
-  const quantity = Math.max(mapped.passengers?.length ?? 0, 1);
-  const normalizedGrandTotal = mapped.grandTotal
-    ? Number(String(mapped.grandTotal).replace(/[^\d.-]/g, ""))
-    : null;
-  const farePerPax =
-    normalizedGrandTotal && quantity
-      ? String(Math.round(normalizedGrandTotal / quantity))
-      : null;
   const bookingReferencePrefix =
     normalizedFunctionCategory === VesselType.CREWING_TANKER
       ? "CT"
@@ -170,37 +122,39 @@ export async function POST(request: Request) {
       provider: mapped.provider,
       status: "DRAFT",
       templateId: template?.id ?? null,
-      pnr: mapped.pnr,
-      ticketNumber: mapped.ticketNumber,
-      airline: mapped.airline,
-      flightNumber: mapped.flightNumber,
-      cabinClass: mapped.cabinClass,
-      departureAirport: mapped.departureAirport,
-      arrivalAirport: mapped.arrivalAirport,
-      departureTerminal: mapped.departureTerminal,
-      departureGate: mapped.departureGate,
+      pnr: mapped.pnr ?? null,
+      ticketNumber: mapped.ticketNumber ?? null,
+      airline: mapped.airline ?? null,
+      flightNumber: mapped.flightNumber ?? null,
+      cabinClass: mapped.cabinClass ?? null,
+      departureCity: mapped.departureCity ?? null,
+      arrivalCity: mapped.arrivalCity ?? null,
+      departureAirport: mapped.departureAirport ?? null,
+      arrivalAirport: mapped.arrivalAirport ?? null,
+      departureTerminal: mapped.departureTerminal ?? null,
+      departureGate: mapped.departureGate ?? null,
       departureDate: mapped.departureDate ? new Date(mapped.departureDate) : null,
       arrivalDate: mapped.arrivalDate ? new Date(mapped.arrivalDate) : null,
-      departureTime: mapped.departureTime,
-      arrivalTerminal: mapped.arrivalTerminal,
-      arrivalTime: mapped.arrivalTime,
-      duration: mapped.duration,
-      currency: mapped.currency,
-      fare: mapped.fare ?? undefined,
-      farePerPax: farePerPax ?? undefined,
-      quantity,
-      tax: mapped.tax ?? undefined,
-      grandTotal: mapped.grandTotal ?? undefined,
-      originalFileName: mapped.originalFileName,
-      objectKey: mapped.objectKey,
-      rawText: mapped.rawText,
+      departureTime: mapped.departureTime ?? null,
+      arrivalTerminal: mapped.arrivalTerminal ?? null,
+      arrivalTime: mapped.arrivalTime ?? null,
+      duration: mapped.duration ?? null,
+      currency: "IDR",
+      quantity: mapped.quantity ?? 1,
+      selectedFlightOptionKey: mapped.selectedFlightOptionKey ?? null,
+      flightOptionsJson: mapped.flightOptions
+        ? JSON.stringify(mapped.flightOptions)
+        : null,
+      originalFileName: file.name,
+      objectKey: uploaded.objectName,
+      rawText: mapped.rawText ?? null,
       passengers: {
         create: (mapped.passengers ?? []).map((passenger) => ({
-          title: passenger.title,
+          title: passenger.title ?? null,
           name: passenger.name,
-          passengerType: passenger.passengerType,
-          baggage: passenger.baggage,
-          ticketNumber: passenger.ticketNumber,
+          passengerType: passenger.passengerType ?? null,
+          baggage: passenger.baggage ?? null,
+          ticketNumber: passenger.ticketNumber ?? null,
         })),
       },
     },
