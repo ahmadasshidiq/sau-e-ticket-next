@@ -1,4 +1,9 @@
-import { InformationCircleIcon } from "@hugeicons/core-free-icons";
+import {
+  Airplane02Icon,
+  Bus01Icon,
+  InformationCircleIcon,
+  Train01Icon,
+} from "@hugeicons/core-free-icons";
 
 import { getFlightTicketProviderMeta } from "@/lib/flight-ticket/providers";
 
@@ -13,6 +18,7 @@ type PassengerLike = {
 type FlightTicketLike = {
   pnr?: string | null;
   ticketNumber?: string | null;
+  bookingReference?: string | null;
   airline?: string | null;
   flightNumber?: string | null;
   cabinClass?: string | null;
@@ -26,10 +32,13 @@ type FlightTicketLike = {
   departureTime?: string | null;
   arrivalTime?: string | null;
   duration?: string | null;
+  serviceMode?: string | null;
   grandTotal?: string | number | null;
   provider?: string | null;
   passengers?: PassengerLike[];
 };
+
+const PROVIDER_LOGO_SRC = "/img/logo-warna.png";
 
 type HugeIconNode = readonly [string, Readonly<Record<string, string | number>>];
 
@@ -212,6 +221,33 @@ function renderAirlineBrandMarkup(airline: string | null | undefined) {
   return `<img src="${logoSrc}" alt="${escapeHtml(airlineName)}" class="airline-logo-image" />`;
 }
 
+function getAirlineLogoSrc(airline: string | null | undefined) {
+  const airlineName = sanitize(airline);
+  const normalized = airlineName.toLowerCase();
+
+  return normalized.includes("batik")
+    ? "/img/maskapai-batik-air.png"
+    : normalized.includes("lion air")
+      ? "/img/maskapai-lion-air.png"
+      : normalized.includes("pelita")
+        ? "/img/maskapai-pelita-air.png"
+        : normalized.includes("garuda")
+          ? "/img/maskapai-garuda.png"
+          : normalized.includes("citilink")
+            ? "/img/maskapai-citilink.png"
+            : normalized.includes("super air jet")
+              ? "/img/maskapai-super-air-jet.png"
+              : normalized.includes("airasia") || normalized.includes("air asia")
+                ? "/img/maskapai-air-asia.png"
+                : normalized.includes("wings air")
+                  ? "/img/maskapai-wings-air.png"
+                  : normalized.includes("transnusa") || normalized.includes("trans nusa")
+                    ? "/img/maskapai-trans-nusa.png"
+                    : normalized === "kai" || normalized.includes("kereta api indonesia")
+                      ? "/img/maskapai-kai.png"
+                      : null;
+}
+
 function renderHugeIconMarkup(icon: readonly HugeIconNode[], size = 12) {
   const children = icon
     .map(([tag, attributes]) => {
@@ -225,6 +261,20 @@ function renderHugeIconMarkup(icon: readonly HugeIconNode[], size = 12) {
     .join("");
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">${children}</svg>`;
+}
+
+function renderServiceModeIcon(serviceMode: string | null | undefined) {
+  const normalized = sanitize(serviceMode).toLowerCase();
+
+  if (normalized === "train") {
+    return renderHugeIconMarkup(Train01Icon, 16);
+  }
+
+  if (normalized === "bus") {
+    return renderHugeIconMarkup(Bus01Icon, 16);
+  }
+
+  return renderHugeIconMarkup(Airplane02Icon, 16);
 }
 
 export function renderFlightTicketHtml(ticket: FlightTicketLike) {
@@ -251,10 +301,12 @@ export function renderFlightTicketHtml(ticket: FlightTicketLike) {
   const arrivalDay = formatDayName(ticket.arrivalDate);
   const departureTime = extractTime(ticket.departureTime);
   const arrivalTime = extractTime(ticket.arrivalTime);
-  const providerLogoSrc = "/img/logo-warna.png";
-  const referenceNumber = ticket.ticketNumber || ticket.pnr;
+  const providerLogoSrc = PROVIDER_LOGO_SRC;
+  const referenceNumber = ticket.bookingReference;
   const infoIcon = renderHugeIconMarkup(InformationCircleIcon);
+  const transportIcon = renderServiceModeIcon(ticket.serviceMode);
   const airlineBrandMarkup = renderAirlineBrandMarkup(ticket.airline);
+  const airlineLogoSrc = getAirlineLogoSrc(ticket.airline);
 
   return `
 <!DOCTYPE html>
@@ -263,6 +315,8 @@ export function renderFlightTicketHtml(ticket: FlightTicketLike) {
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>${escapeHtml(provider.templateName)}</title>
+    <link rel="preload" as="image" href="${providerLogoSrc}" fetchpriority="high" />
+    ${airlineLogoSrc ? `<link rel="preload" as="image" href="${airlineLogoSrc}" fetchpriority="high" />` : ""}
     <style>
         @page {
             size: A4;
@@ -765,12 +819,12 @@ export function renderFlightTicketHtml(ticket: FlightTicketLike) {
         .route {
             flex: 1;
             display: grid;
-            grid-template-columns: minmax(0, 200px) 1fr minmax(0, 200px);
+            grid-template-columns: minmax(0, 170px) 1fr minmax(0, 170px);
             align-items: start;
         }
 
         .stop {
-            width: 200px;
+            width: 170px;
             min-width: 0;
         }
 
@@ -831,10 +885,28 @@ export function renderFlightTicketHtml(ticket: FlightTicketLike) {
 
         .duration {
             display: flex !important;
-            align-items: center !important;
-            margin-top: 47px;
-            /* aligns the line with the vertical center of the time row */
+            flex-direction: column !important;
+            align-items: stretch !important;
+            margin-top: 32px;
             width: 100% !important;
+            gap: 8px;
+        }
+
+        .duration .label {
+            text-align: center;
+        }
+
+        .duration .label .en {
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .duration .track {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            gap: 0;
         }
 
         .duration .dot {
@@ -843,7 +915,8 @@ export function renderFlightTicketHtml(ticket: FlightTicketLike) {
             border-radius: 50% !important;
             flex: none !important;
             display: block !important;
-            /* overrides ".duration span { display:none }" so the dots show */
+            position: relative;
+            z-index: 1;
         }
 
         .duration .dot.start {
@@ -861,24 +934,17 @@ export function renderFlightTicketHtml(ticket: FlightTicketLike) {
             height: 2px !important;
             background: var(--brand-blue-gradient) !important;
             display: block !important;
+            margin: 0 -1px;
         }
 
-        .duration .info {
+        .duration .plane {
             flex: none;
-            background: #fff;
-            padding: 0 14px;
-            text-align: center;
-        }
-
-        .duration .info .en {
-            font-size: 14px;
-            font-weight: 600;
-            color: #333;
-        }
-
-        .duration .info .id {
-            font-size: 12px;
-            color: #999;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--brand-blue);
+            line-height: 1;
+            margin: 0 12px;
         }
     </style>
 </head>
@@ -959,13 +1025,16 @@ export function renderFlightTicketHtml(ticket: FlightTicketLike) {
                     </div>
 
                     <div class="duration" style="margin-top: 3.5rem">
-                        <span class="dot start"></span>
-                        <span class="line-seg"></span>
-                        <div class="info">
+                        <div class="label">
                             <div class="en">${escapeHtml(duration.primary)}</div>
                         </div>
-                        <span class="line-seg"></span>
-                        <span class="dot end"></span>
+                        <div class="track">
+                            <span class="dot start"></span>
+                            <span class="line-seg"></span>
+                            <span class="plane">${transportIcon}</span>
+                            <span class="line-seg"></span>
+                            <span class="dot end"></span>
+                        </div>
                     </div>
 
                     <div class="stop arrival">

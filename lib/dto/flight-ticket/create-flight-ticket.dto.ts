@@ -23,7 +23,6 @@ export interface CreateFlightTicketDto {
   arrivalTime?: string | null;
   duration?: string | null;
   currency?: string | null;
-  fare?: string | number | null;
   farePerPax?: string | number | null;
   tax?: string | number | null;
   grandTotal?: string | number | null;

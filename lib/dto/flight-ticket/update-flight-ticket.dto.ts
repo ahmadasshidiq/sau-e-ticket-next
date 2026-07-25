@@ -23,7 +23,6 @@ export interface UpdateFlightTicketDto {
   arrivalTime?: string | null;
   duration?: string | null;
   currency?: string | null;
-  fare?: string | number | null;
   tax?: string | number | null;
   grandTotal?: string | number | null;
   selectedFlightOptionKey?: string | null;

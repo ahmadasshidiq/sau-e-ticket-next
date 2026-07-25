@@ -33,8 +33,8 @@ const mainItems: NavItem[] = [
 ];
 
 const documentItems: NavItem[] = [
-  { label: "Invoice", href: "/invoices", icon: Invoice01Icon },
   { label: "Flight Ticket", href: "/flight-tickets", icon: AirplaneLanding01Icon },
+  { label: "Invoice", href: "/invoices", icon: Invoice01Icon },
 ];
 
 const systemItems: NavItem[] = [

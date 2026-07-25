@@ -15,6 +15,12 @@ if (minioPublicUrl) {
 }
 
 const nextConfig: NextConfig = {
+  serverExternalPackages: [
+    "@napi-rs/canvas",
+    "@napi-rs/canvas-darwin-arm64",
+    "tesseract.js",
+    "tesseract.js-core",
+  ],
   images: {
     remotePatterns,
   },

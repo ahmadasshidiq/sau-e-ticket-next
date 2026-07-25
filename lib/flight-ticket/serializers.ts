@@ -2,11 +2,23 @@ import type { FlightTicket, Passenger } from "@prisma/client";
 import type { FlightOption } from "@/lib/flight-ticket/flight-options";
 
 type FlightTicketWithPassengers = FlightTicket & {
-  passengers: Passenger[];
   template?: {
     id: string;
     name: string;
   } | null;
+  vessel?: {
+    id: string;
+    name: string;
+    type: string;
+  } | null;
+  passengers: Array<
+    Passenger & {
+      rank?: {
+        id: string;
+        name: string;
+      } | null;
+    }
+  >;
 };
 
 export function serializeFlightTicket(ticket: FlightTicketWithPassengers) {
@@ -23,6 +35,9 @@ export function serializeFlightTicket(ticket: FlightTicketWithPassengers) {
   return {
     id: ticket.id,
     functionCategory: ticket.functionCategory,
+    vesselId: ticket.vesselId,
+    vesselName: ticket.vessel?.name ?? null,
+    vesselType: ticket.vessel?.type ?? null,
     assign: ticket.assign,
     serviceMode: ticket.serviceMode,
     bookingReference: ticket.bookingReference,
@@ -48,7 +63,6 @@ export function serializeFlightTicket(ticket: FlightTicketWithPassengers) {
     arrivalTime: ticket.arrivalTime,
     duration: ticket.duration,
     currency: ticket.currency,
-    fare: ticket.fare?.toString() ?? null,
     farePerPax: ticket.farePerPax?.toString() ?? null,
     quantity: ticket.quantity ?? 1,
     tax: ticket.tax?.toString() ?? null,
@@ -62,6 +76,8 @@ export function serializeFlightTicket(ticket: FlightTicketWithPassengers) {
     updatedAt: ticket.updatedAt.toISOString(),
     passengers: ticket.passengers.map((passenger) => ({
       id: passenger.id,
+      rankId: passenger.rank?.id ?? null,
+      rankName: passenger.rank?.name ?? null,
       title: passenger.title,
       name: passenger.name,
       passengerType: passenger.passengerType,

@@ -10,13 +10,30 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const page = Math.max(1, Number(searchParams.get("page") ?? "1"));
   const pageSize = Math.max(1, Number(searchParams.get("pageSize") ?? "10"));
+  const functionCategory = searchParams.get("functionCategory")?.trim() ?? "";
+  const vesselName = searchParams.get("vesselName")?.trim() ?? "";
+  const serviceMode = searchParams.get("serviceMode")?.trim() ?? "";
   const provider = searchParams.get("provider")?.trim() ?? "";
   const status = searchParams.get("status")?.trim() ?? "";
   const keyword = searchParams.get("keyword")?.trim() ?? "";
 
   const where = {
+    ...(functionCategory
+      ? { functionCategory: functionCategory as "CREWING_TANKER" | "CMOS" | "TAD" }
+      : {}),
+    ...(serviceMode ? { serviceMode } : {}),
     ...(provider ? { provider } : {}),
     ...(status ? { status: status as "DRAFT" | "GENERATED" } : {}),
+    ...(vesselName
+      ? {
+          vessel: {
+            name: {
+              contains: vesselName,
+              mode: "insensitive" as const,
+            },
+          },
+        }
+      : {}),
     ...(keyword
       ? {
           OR: [
@@ -33,6 +50,12 @@ export async function GET(request: Request) {
                 mode: "insensitive" as const,
               },
             },
+            {
+              bookingReference: {
+                contains: keyword,
+                mode: "insensitive" as const,
+              },
+            },
           ],
         }
       : {}),
@@ -42,7 +65,23 @@ export async function GET(request: Request) {
     prisma.flightTicket.findMany({
       where,
       include: {
-        passengers: true,
+        passengers: {
+          include: {
+            rank: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+        vessel: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
+          },
+        },
         template: {
           select: {
             id: true,

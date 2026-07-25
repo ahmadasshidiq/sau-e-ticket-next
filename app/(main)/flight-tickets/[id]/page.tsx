@@ -13,12 +13,16 @@ import { DashboardShell } from "@/components/dashboard-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SearchableSelect, type SearchableSelectOption } from "@/components/searchable-select";
+import { useDebouncedRemoteSearch } from "@/hooks/use-debounced-remote-search";
 import { toast } from "@/lib/toast";
 import { SelectField } from "@/components/select-field";
 import type { FlightOption } from "@/lib/flight-ticket/flight-options";
 
 type Passenger = {
   id?: string;
+  rankId?: string | null;
+  rankName?: string | null;
   title?: string | null;
   name: string;
   passengerType?: string | null;
@@ -26,9 +30,17 @@ type Passenger = {
   ticketNumber?: string | null;
 };
 
+type RankOption = {
+  id: string;
+  name: string;
+};
+
 type FlightTicketDetail = {
   id: string;
   functionCategory: "CREWING_TANKER" | "CMOS" | "TAD" | null;
+  vesselId: string | null;
+  vesselName: string | null;
+  vesselType: "CREWING_TANKER" | "CMOS" | "TAD" | null;
   assign: "Sign On" | "Sign Off" | null;
   serviceMode: "Flight" | "Train" | "Bus" | null;
   bookingReference: string | null;
@@ -58,7 +70,15 @@ type FlightTicketDetail = {
   passengers: Passenger[];
 };
 
+type VesselOption = {
+  id: string;
+  name: string;
+  type: "CREWING_TANKER" | "CMOS" | "TAD";
+};
+
 const emptyPassenger: Passenger = {
+  rankId: null,
+  rankName: null,
   title: "",
   name: "",
   passengerType: "",
@@ -102,6 +122,20 @@ function computeGrandTotal(
   return String(normalizedFare * normalizedQuantity);
 }
 
+function reindexPassengerMap<T>(source: Record<number, T>, removedIndex: number) {
+  return Object.entries(source).reduce<Record<number, T>>((accumulator, entry) => {
+    const index = Number(entry[0]);
+    const value = entry[1] as T;
+
+    if (index === removedIndex) {
+      return accumulator;
+    }
+
+    accumulator[index > removedIndex ? index - 1 : index] = value;
+    return accumulator;
+  }, {});
+}
+
 function applyFlightOption(
   ticket: FlightTicketDetail,
   option: FlightOption
@@ -133,6 +167,12 @@ export default function ValidateFlightTicketPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [vesselSearch, setVesselSearch] = useState("");
+  const [isVesselOpen, setIsVesselOpen] = useState(false);
+  const [rankSearches, setRankSearches] = useState<Record<number, string>>({});
+  const [rankOptions, setRankOptions] = useState<Record<number, RankOption[]>>({});
+  const [rankLoading, setRankLoading] = useState<Record<number, boolean>>({});
+  const [openRankIndex, setOpenRankIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (!params.id) {
@@ -149,6 +189,17 @@ export default function ValidateFlightTicketPage() {
       })
       .then((result) => {
         setTicket(result);
+        setVesselSearch(result.vesselName ?? "");
+        setRankSearches(
+          Array.isArray(result.passengers)
+            ? Object.fromEntries(
+                result.passengers.map((passenger: Passenger, index: number) => [
+                  index,
+                  passenger.rankName ?? "",
+                ])
+              )
+            : {}
+        );
       })
       .catch((error: unknown) => {
         toast({
@@ -162,6 +213,113 @@ export default function ValidateFlightTicketPage() {
         setLoading(false);
       });
   }, [params.id]);
+
+  const {
+    items: vesselOptions,
+    loading: vesselLoading,
+    setItems: setVesselOptions,
+  } = useDebouncedRemoteSearch<VesselOption>({
+    query: vesselSearch,
+    enabled: Boolean(ticket?.functionCategory),
+    deps: [ticket?.functionCategory],
+    search: async (query, signal) => {
+      const searchParams = new URLSearchParams({
+        page: "1",
+        pageSize: "10",
+        type: ticket?.functionCategory ?? "",
+      });
+
+      if (query.trim()) {
+        searchParams.set("name", query.trim());
+      }
+
+      const response = await fetch(`/api/vessels?${searchParams.toString()}`, {
+        cache: "no-store",
+        signal,
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to load vessels.");
+      }
+
+      const result = (await response.json()) as {
+        data?: VesselOption[];
+      };
+
+      return result.data ?? [];
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to load vessels",
+        description:
+          error instanceof Error ? error.message : "Unknown error occurred.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const {
+    items: activeRankItems,
+    loading: activeRankLoading,
+  } = useDebouncedRemoteSearch<RankOption>({
+    query: openRankIndex !== null ? rankSearches[openRankIndex] ?? "" : "",
+    enabled: openRankIndex !== null,
+    search: async (query, signal) => {
+      const searchParams = new URLSearchParams({
+        page: "1",
+        pageSize: "10",
+      });
+
+      if (query.trim()) {
+        searchParams.set("name", query.trim());
+      }
+
+      const response = await fetch(`/api/ranks?${searchParams.toString()}`, {
+        cache: "no-store",
+        signal,
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to load ranks.");
+      }
+
+      const result = (await response.json()) as {
+        data?: RankOption[];
+      };
+
+      return result.data ?? [];
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to load ranks",
+        description:
+          error instanceof Error ? error.message : "Unknown error occurred.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  useEffect(() => {
+    if (openRankIndex === null) {
+      return;
+    }
+
+    setRankOptions((current) => ({
+      ...current,
+      [openRankIndex]: activeRankItems,
+    }));
+  }, [activeRankItems, openRankIndex]);
+
+  useEffect(() => {
+    if (openRankIndex === null) {
+      return;
+    }
+
+    setRankLoading((current) => ({
+      ...current,
+      [openRankIndex]: activeRankLoading,
+    }));
+  }, [activeRankLoading, openRankIndex]);
 
   function updateField<Key extends keyof FlightTicketDetail>(
     key: Key,
@@ -218,6 +376,15 @@ export default function ValidateFlightTicketPage() {
         ...current,
         passengers: current.passengers.filter((_, passengerIndex) => passengerIndex !== index),
       };
+    });
+
+    setRankSearches((current) => reindexPassengerMap(current, index));
+    setRankOptions((current) => reindexPassengerMap(current, index));
+    setRankLoading((current) => reindexPassengerMap(current, index));
+    setOpenRankIndex((current) => {
+      if (current === null) return current;
+      if (current === index) return null;
+      return current > index ? current - 1 : current;
     });
   }
 
@@ -376,17 +543,79 @@ export default function ValidateFlightTicketPage() {
                 <SelectField
                   label="Fungsi"
                   value={ticket.functionCategory ?? ""}
-                  onChange={(value) =>
-                    updateField(
-                      "functionCategory",
-                      (value || null) as FlightTicketDetail["functionCategory"]
-                    )
-                  }
+                  onChange={(value) => {
+                    const nextFunctionCategory =
+                      (value || null) as FlightTicketDetail["functionCategory"];
+
+                    setTicket((current) =>
+                      current
+                        ? {
+                            ...current,
+                            functionCategory: nextFunctionCategory,
+                            vesselId: null,
+                            vesselName: null,
+                            vesselType: null,
+                          }
+                        : current
+                    );
+                    setVesselSearch("");
+                    setVesselOptions([]);
+                    setIsVesselOpen(false);
+                  }}
                   options={[
                     { label: "Crewing Tanker", value: "CREWING_TANKER" },
                     { label: "CMOS", value: "CMOS" },
                     { label: "TAD", value: "TAD" },
                   ]}
+                />
+                <SearchableSelect
+                  label="Vessel"
+                  value={vesselSearch}
+                  selectedId={ticket.vesselId}
+                  loading={vesselLoading}
+                  open={isVesselOpen}
+                  options={vesselOptions.map<SearchableSelectOption>((vessel) => ({
+                    id: vessel.id,
+                    label: vessel.name,
+                    meta: vessel.type,
+                  }))}
+                  disabled={!ticket.functionCategory}
+                  placeholder={!ticket.functionCategory ? "Select fungsi first" : "Search vessel name"}
+                  onOpen={() => setIsVesselOpen(true)}
+                  onClose={() => setIsVesselOpen(false)}
+                  onChange={(value) => {
+                    setVesselSearch(value);
+                    setIsVesselOpen(true);
+                    setTicket((current) =>
+                      current
+                        ? {
+                            ...current,
+                            vesselId: null,
+                            vesselName: value || null,
+                            vesselType: current.functionCategory,
+                          }
+                        : current
+                    );
+                  }}
+                  onSelect={(option) => {
+                    const vessel = vesselOptions.find((item) => item.id === option.id);
+                    if (!vessel) return;
+
+                    setVesselSearch(vessel.name);
+                    setIsVesselOpen(false);
+                    setTicket((current) =>
+                      current
+                        ? {
+                            ...current,
+                            vesselId: vessel.id,
+                            vesselName: vessel.name,
+                            vesselType: vessel.type,
+                          }
+                        : current
+                    );
+                  }}
+                  loadingText="Loading vessels..."
+                  emptyText="No vessels found."
                 />
                 <SelectField
                   label="Assign"
@@ -415,7 +644,7 @@ export default function ValidateFlightTicketPage() {
                   ]}
                 />
                 <Field
-                  label="Booking Reference"
+                  label="Reference Number"
                   value={ticket.bookingReference}
                   onChange={(value) => updateField("bookingReference", value)}
                 />
@@ -526,8 +755,8 @@ export default function ValidateFlightTicketPage() {
                         <HugeiconsIcon icon={Delete02Icon} size={18} strokeWidth={1.8} />
                       </Button>
                     </div>
-                    <div className="grid gap-5 xl:grid-cols-12">
-                      <div className="xl:col-span-2">
+                    <div className="grid gap-5 xl:grid-cols-7">
+                      <div className="xl:col-span-1">
                         <SelectField
                           label="Title"
                           value={passenger.title ?? ""}
@@ -539,21 +768,92 @@ export default function ValidateFlightTicketPage() {
                           ]}
                         />
                       </div>
-                      <div className="xl:col-span-3">
+                      <div className="xl:col-span-2">
                         <Field
                           label="Passenger Name"
                           value={passenger.name}
                           onChange={(value) => updatePassenger(index, "name", value)}
                         />
                       </div>
-                      <div className="xl:col-span-2">
+                      <div className="xl:col-span-1">
+                        <SearchableSelect
+                          label="Rank"
+                          value={rankSearches[index] ?? passenger.rankName ?? ""}
+                          selectedId={passenger.rankId ?? null}
+                          loading={rankLoading[index] ?? false}
+                          open={openRankIndex === index}
+                          options={(rankOptions[index] ?? []).map<SearchableSelectOption>((rank) => ({
+                            id: rank.id,
+                            label: rank.name,
+                          }))}
+                          placeholder="Search rank"
+                          onOpen={() => setOpenRankIndex(index)}
+                          onClose={() =>
+                            setOpenRankIndex((current) => (current === index ? null : current))
+                          }
+                          onChange={(value) => {
+                            setRankSearches((current) => ({
+                              ...current,
+                              [index]: value,
+                            }));
+                            setOpenRankIndex(index);
+                            setTicket((current) =>
+                              current
+                                ? {
+                                    ...current,
+                                    passengers: current.passengers.map((item, passengerIndex) =>
+                                      passengerIndex === index
+                                        ? {
+                                            ...item,
+                                            rankId: null,
+                                            rankName: value || null,
+                                          }
+                                        : item
+                                    ),
+                                  }
+                                : current
+                            );
+                          }}
+                          onSelect={(option) => {
+                            const rank = (rankOptions[index] ?? []).find(
+                              (item) => item.id === option.id
+                            );
+                            if (!rank) return;
+
+                            setRankSearches((current) => ({
+                              ...current,
+                              [index]: rank.name,
+                            }));
+                            setOpenRankIndex(null);
+                            setTicket((current) =>
+                              current
+                                ? {
+                                    ...current,
+                                    passengers: current.passengers.map((item, passengerIndex) =>
+                                      passengerIndex === index
+                                        ? {
+                                            ...item,
+                                            rankId: rank.id,
+                                            rankName: rank.name,
+                                          }
+                                        : item
+                                    ),
+                                  }
+                                : current
+                            );
+                          }}
+                          loadingText="Loading ranks..."
+                          emptyText="No ranks found."
+                        />
+                      </div>
+                      <div className="xl:col-span-1">
                         <Field
                           label="Ticket Number"
                           value={passenger.ticketNumber}
                           onChange={(value) => updatePassenger(index, "ticketNumber", value)}
                         />
                       </div>
-                      <div className="xl:col-span-3">
+                      <div className="xl:col-span-1">
                         <SelectField
                           label="Passenger Type"
                           value={passenger.passengerType ?? ""}
@@ -565,7 +865,7 @@ export default function ValidateFlightTicketPage() {
                           ]}
                         />
                       </div>
-                      <div className="xl:col-span-2">
+                      <div className="xl:col-span-1">
                         <Field
                           label="Checked Baggage"
                           value={passenger.baggage}

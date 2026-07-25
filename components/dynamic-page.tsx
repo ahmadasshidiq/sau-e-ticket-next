@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
+import { usePathname } from "next/navigation";
 import {
   ArrowDown01Icon,
   Cancel01Icon,
@@ -53,6 +54,7 @@ type FilterField = {
 type DynamicPageProps<T> = {
   columns: DataColumn<T>[];
   rows: T[];
+  persistenceKey?: string;
   primaryAction?: ToolbarAction;
   secondaryActions?: ToolbarAction[];
   filterContent?: ReactNode;
@@ -80,6 +82,7 @@ type DynamicPageProps<T> = {
 export function DynamicPage<T>({
   columns,
   rows,
+  persistenceKey,
   primaryAction,
   secondaryActions = [],
   filterContent,
@@ -103,6 +106,7 @@ export function DynamicPage<T>({
   serverSidePagination = false,
   loading = false,
 }: DynamicPageProps<T>) {
+  const pathname = usePathname();
   const columnTriggerRef = useRef<HTMLDivElement | null>(null);
   const columnDropdownRef = useRef<HTMLDivElement | null>(null);
   const [pageSize, setPageSize] = useState(initialPageSize);
@@ -114,6 +118,10 @@ export function DynamicPage<T>({
     columns
       .filter((column) => column.defaultVisible !== false)
       .map((column) => String(column.key))
+  );
+  const columnStorageKey = useMemo(
+    () => `dynamic-page:columns:${persistenceKey ?? pathname}`,
+    [pathname, persistenceKey]
   );
 
   const effectiveFilterValues = controlledFilterValues ?? filterValues;
@@ -167,6 +175,51 @@ export function DynamicPage<T>({
   }, [effectivePageSize, filteredRows, rows, safePage, serverSidePagination]);
 
   useEffect(() => {
+    const defaultVisibleKeys = columns
+      .filter((column) => column.defaultVisible !== false)
+      .map((column) => String(column.key));
+
+    try {
+      const storedValue = window.localStorage.getItem(columnStorageKey);
+
+      if (!storedValue) {
+        setVisibleColumnKeys(defaultVisibleKeys);
+        return;
+      }
+
+      const parsedValue = JSON.parse(storedValue);
+
+      if (!Array.isArray(parsedValue)) {
+        setVisibleColumnKeys(defaultVisibleKeys);
+        return;
+      }
+
+      const availableKeys = new Set(columns.map((column) => String(column.key)));
+      const nextVisibleKeys = parsedValue.filter(
+        (key): key is string =>
+          typeof key === "string" && availableKeys.has(key)
+      );
+
+      setVisibleColumnKeys(
+        nextVisibleKeys.length > 0 ? nextVisibleKeys : defaultVisibleKeys
+      );
+    } catch {
+      setVisibleColumnKeys(defaultVisibleKeys);
+    }
+  }, [columnStorageKey, columns]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        columnStorageKey,
+        JSON.stringify(visibleColumnKeys)
+      );
+    } catch {
+      // Ignore storage write errors and keep the UI usable.
+    }
+  }, [columnStorageKey, visibleColumnKeys]);
+
+  useEffect(() => {
     if (!isColumnOpen) return;
 
     function handlePointerDown(event: MouseEvent) {
@@ -213,9 +266,8 @@ export function DynamicPage<T>({
         <div className="relative flex w-full flex-wrap items-center gap-3 sm:w-auto">
           <div className="flex w-full gap-3 sm:w-auto">
             <ToolbarMenuButton
-              label="Filters"
+              label="Search"
               icon={<HugeiconsIcon icon={FilterHorizontalIcon} size={18} strokeWidth={1.8} />}
-              content={filterContent}
               onClick={() => setIsFilterOpen(true)}
               className="flex-1 sm:flex-none"
             />
@@ -223,7 +275,6 @@ export function DynamicPage<T>({
               <ToolbarMenuButton
                 label="Column"
                 icon={<HugeiconsIcon icon={ArrowDown01Icon} size={18} strokeWidth={1.8} />}
-                content={columnContent}
                 iconTrailing
                 onClick={() => setIsColumnOpen((current) => !current)}
                 className="w-full sm:w-auto"
@@ -490,14 +541,12 @@ function ToolbarActionButton({
 function ToolbarMenuButton({
   label,
   icon,
-  content,
   iconTrailing = false,
   onClick,
   className = "",
 }: {
   label: string;
   icon: ReactNode;
-  content?: ReactNode;
   iconTrailing?: boolean;
   onClick?: () => void;
   className?: string;
@@ -511,7 +560,6 @@ function ToolbarMenuButton({
       {iconTrailing ? null : icon}
       <span>{label}</span>
       {iconTrailing ? icon : null}
-      {content ? <div className="hidden">{content}</div> : null}
     </button>
   );
 }
@@ -608,20 +656,23 @@ function FilterModal({
         </div>
 
         <div className="mt-6 space-y-5">
-          {fields.map((field) => (
-            <div key={field.key} className="space-y-2.5">
-              <Label className="text-[14px] font-medium text-[#374151] dark:text-[#d1d5db]">
-                {field.label}
-              </Label>
-              <Input
-                value={values[field.key] ?? ""}
-                onChange={(event) => onChange(field.key, event.target.value)}
-                placeholder={field.placeholder}
-                className="h-[46px] rounded-[14px] border-[#d1d5db] bg-white px-4 text-[14px] text-[#111827] placeholder:text-[#9ca3af] focus-visible:border-[#4438ff] focus-visible:ring-[color:rgba(68,56,255,0.12)] dark:border-white/10 dark:bg-[#151d2c] dark:text-white dark:placeholder:text-[#64748b]"
-              />
-            </div>
-          ))}
-          {content ? <div className="hidden">{content}</div> : null}
+          {content ? (
+            content
+          ) : (
+            fields.map((field) => (
+              <div key={field.key} className="space-y-2.5">
+                <Label className="text-[14px] font-medium text-[#374151] dark:text-[#d1d5db]">
+                  {field.label}
+                </Label>
+                <Input
+                  value={values[field.key] ?? ""}
+                  onChange={(event) => onChange(field.key, event.target.value)}
+                  placeholder={field.placeholder}
+                  className="h-[46px] rounded-[14px] border-[#d1d5db] bg-white px-4 text-[14px] text-[#111827] placeholder:text-[#9ca3af] focus-visible:border-[#4438ff] focus-visible:ring-[color:rgba(68,56,255,0.12)] dark:border-white/10 dark:bg-[#151d2c] dark:text-white dark:placeholder:text-[#64748b]"
+                />
+              </div>
+            ))
+          )}
         </div>
 
         <div className="mt-8 flex items-center justify-end gap-4">

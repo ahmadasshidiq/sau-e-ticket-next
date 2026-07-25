@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { assertApiSession } from "@/lib/auth";
 import { serializeFlightTicket } from "@/lib/flight-ticket/serializers";
-import { removeFromMinio } from "@/lib/minio";
+// import { removeFromMinio } from "@/lib/minio";
 import { prisma } from "@/lib/prisma";
 
 function parseDecimal(value: unknown) {
@@ -29,7 +29,23 @@ export async function GET(
   const ticket = await prisma.flightTicket.findUnique({
     where: { id },
     include: {
-      passengers: true,
+      passengers: {
+        include: {
+          rank: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      },
+      vessel: {
+        select: {
+          id: true,
+          name: true,
+          type: true,
+        },
+      },
       template: {
         select: {
           id: true,
@@ -63,6 +79,7 @@ export async function PATCH(
     where: { id },
     data: {
       functionCategory: body.functionCategory ?? null,
+      vesselId: body.vesselId ?? null,
       assign: body.assign ?? null,
       serviceMode: body.serviceMode ?? null,
       bookingReference: body.bookingReference ?? null,
@@ -86,7 +103,6 @@ export async function PATCH(
       arrivalTime: body.arrivalTime ?? null,
       duration: body.duration ?? null,
       currency: body.currency ?? "IDR",
-      fare: parseDecimal(body.fare),
       farePerPax: parseDecimal(body.farePerPax),
       quantity: body.quantity ? Number(body.quantity) : 1,
       tax: parseDecimal(body.tax),
@@ -100,6 +116,7 @@ export async function PATCH(
         deleteMany: {},
         create: Array.isArray(body.passengers)
           ? body.passengers.map((passenger: Record<string, unknown>) => ({
+              rankId: passenger.rankId ? String(passenger.rankId) : null,
               title: passenger.title ? String(passenger.title) : null,
               name: String(passenger.name ?? ""),
               passengerType: passenger.passengerType
@@ -114,7 +131,23 @@ export async function PATCH(
       },
     },
     include: {
-      passengers: true,
+      passengers: {
+        include: {
+          rank: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      },
+      vessel: {
+        select: {
+          id: true,
+          name: true,
+          type: true,
+        },
+      },
       template: {
         select: {
           id: true,
@@ -141,7 +174,6 @@ export async function DELETE(
       where: { id },
       select: {
         id: true,
-        objectKey: true,
       },
     });
 
@@ -156,13 +188,13 @@ export async function DELETE(
       where: { id },
     });
 
-    if (ticket.objectKey) {
-      try {
-        await removeFromMinio(ticket.objectKey);
-      } catch {
-        // Keep the record deletion successful even if object cleanup fails.
-      }
-    }
+    // if (ticket.objectKey) {
+    //   try {
+    //     await removeFromMinio(ticket.objectKey);
+    //   } catch {
+    //     // Keep the record deletion successful even if object cleanup fails.
+    //   }
+    // }
 
     return NextResponse.json({ success: true });
   } catch (error) {

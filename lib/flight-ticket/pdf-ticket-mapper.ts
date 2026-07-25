@@ -1,5 +1,8 @@
 import type { CreateFlightTicketDto } from "@/lib/dto/flight-ticket/create-flight-ticket.dto";
-import type { FlightTicketProvider } from "@/lib/flight-ticket/providers";
+import {
+  FLIGHT_TICKET_PROVIDERS,
+  type FlightTicketProvider,
+} from "@/lib/flight-ticket/providers";
 import {
   groupItemsIntoLines,
   normalizeWhitespace,
@@ -13,8 +16,15 @@ import {
 import { mapCueTravel } from "@/lib/flight-ticket/pdf-ticket-mappers/cue-travel";
 import { mapCueTravelMulti } from "@/lib/flight-ticket/pdf-ticket-mappers/cue-travel-multi";
 import { mapVia } from "@/lib/flight-ticket/pdf-ticket-mappers/via";
+import { mapViaWithOcr } from "@/lib/flight-ticket/pdf-ticket-mappers/via-ocr";
 import { mapGaruda } from "@/lib/flight-ticket/pdf-ticket-mappers/garuda";
-import { writeFileSync } from "fs";
+import { mapCitilink } from "@/lib/flight-ticket/pdf-ticket-mappers/citilink";
+import { mapLionAir } from "@/lib/flight-ticket/pdf-ticket-mappers/lion-air";
+import { mapTrain } from "@/lib/flight-ticket/pdf-ticket-mappers/train";
+
+const FLIGHT_TICKET_PROVIDER_VALUES = new Set<FlightTicketProvider>(
+  FLIGHT_TICKET_PROVIDERS.map((provider) => provider.value)
+);
 
 function cleanText(value: string) {
   return normalizeWhitespace(
@@ -88,13 +98,6 @@ async function extractPdfTextItems(buffer: Buffer) {
       }
     }
 
-    writeFileSync(
-      "/tmp/cue-travel-items.json",
-      JSON.stringify(items, null, 2),
-      "utf-8"
-    );
-    console.log("saved to /tmp/cue-travel-items.json");
-
     return items;
   } finally {
     await loadingTask.destroy();
@@ -110,15 +113,12 @@ export async function mapFlightTicketPdfToDraft(
   >
 ) {
   const normalizedProvider = provider.trim().toUpperCase() as FlightTicketProvider;
+  const resolvedProvider = FLIGHT_TICKET_PROVIDER_VALUES.has(normalizedProvider)
+    ? normalizedProvider
+    : "TRAVELOKA";
 
   const baseDraft: PartialFlightTicketDraft = {
-    provider:
-      normalizedProvider === "TRAVELOKA" ||
-        normalizedProvider === "VIA" ||
-        normalizedProvider === "GARUDA" ||
-        normalizedProvider === "CUE_TRAVEL"
-        ? normalizedProvider
-        : "TRAVELOKA",
+    provider: resolvedProvider,
     originalFileName: fallback.originalFileName,
     objectKey: fallback.objectKey,
     rawText: null,
@@ -130,6 +130,30 @@ export async function mapFlightTicketPdfToDraft(
     buffer.byteLength > 0;
   if (!isPdf) {
     return baseDraft;
+  }
+
+  if (baseDraft.provider === "VIA") {
+    try {
+      const ocrMapped = await mapViaWithOcr(buffer);
+      const ocrPassengerCount = ocrMapped?.passengers?.length ?? 0;
+      if (
+        ocrMapped &&
+        (
+          ocrMapped.pnr ||
+          ocrMapped.ticketNumber ||
+          ocrMapped.airline ||
+          ocrMapped.departureAirport ||
+          ocrPassengerCount > 0
+        )
+      ) {
+        return {
+          ...baseDraft,
+          ...ocrMapped,
+        };
+      }
+    } catch (error) {
+      console.error("VIA OCR fallback failed.", error);
+    }
   }
 
   try {
@@ -215,6 +239,57 @@ export async function mapFlightTicketPdfToDraft(
 
     if (baseDraft.provider === "GARUDA") {
       const mapped = mapGaruda(lines);
+      const passengerCount = mapped.passengers?.length ?? 0;
+      if (
+        mapped.pnr ||
+        mapped.ticketNumber ||
+        mapped.airline ||
+        mapped.departureAirport ||
+        passengerCount > 0
+      ) {
+        return {
+          ...baseDraft,
+          ...mapped,
+        };
+      }
+    }
+
+    if (baseDraft.provider === "CITILINK") {
+      const mapped = mapCitilink(lines);
+      const passengerCount = mapped.passengers?.length ?? 0;
+      if (
+        mapped.pnr ||
+        mapped.ticketNumber ||
+        mapped.airline ||
+        mapped.departureAirport ||
+        passengerCount > 0
+      ) {
+        return {
+          ...baseDraft,
+          ...mapped,
+        };
+      }
+    }
+
+    if (baseDraft.provider === "LION_AIR") {
+      const mapped = mapLionAir(lines);
+      const passengerCount = mapped.passengers?.length ?? 0;
+      if (
+        mapped.pnr ||
+        mapped.ticketNumber ||
+        mapped.airline ||
+        mapped.departureAirport ||
+        passengerCount > 0
+      ) {
+        return {
+          ...baseDraft,
+          ...mapped,
+        };
+      }
+    }
+
+    if (baseDraft.provider === "TRAIN") {
+      const mapped = mapTrain(lines);
       const passengerCount = mapped.passengers?.length ?? 0;
       if (
         mapped.pnr ||

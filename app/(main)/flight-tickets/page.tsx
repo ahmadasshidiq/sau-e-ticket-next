@@ -26,6 +26,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SearchableSelect, type SearchableSelectOption } from "@/components/searchable-select";
+import { useDebouncedRemoteSearch } from "@/hooks/use-debounced-remote-search";
 import { toast } from "@/lib/toast";
 import {
   FLIGHT_TICKET_PROVIDERS,
@@ -35,6 +37,7 @@ import {
 type FlightTicketRecord = {
   id: string;
   functionCategory: "CREWING_TANKER" | "CMOS" | "TAD" | null;
+  vesselName: string | null;
   assign: "Sign On" | "Sign Off" | null;
   serviceMode: "Flight" | "Train" | "Bus" | null;
   bookingReference: string | null;
@@ -48,14 +51,26 @@ type FlightTicketRecord = {
   departureDate: string | null;
   grandTotal: string | null;
   createdAt: string;
+  passengers: Array<{
+    id: string;
+    name: string;
+  }>;
 };
 
 type FlightTicketRow = FlightTicketRecord & {
+  rowNumber: number;
+  passengerNames: string;
   functionCategoryDisplay: string;
   providerLabel: string;
   templateDisplay: string;
   departureDateDisplay: string;
   createdAtDisplay: string;
+};
+
+type VesselOption = {
+  id: string;
+  name: string;
+  type: string;
 };
 
 function truncateWords(value: unknown, maxWords = 3) {
@@ -100,10 +115,26 @@ const SERVICE_MODE_OPTIONS = [
   { label: "Bus", value: "Bus" },
 ] as const;
 
+const STATUS_OPTIONS = [
+  { label: "Draft", value: "DRAFT" },
+  { label: "Generated", value: "GENERATED" },
+] as const;
+
+const PROVIDER_FILTER_OPTIONS = FLIGHT_TICKET_PROVIDERS.map((provider) => ({
+  label: provider.label,
+  value: provider.value,
+}));
+
+const ALL_FILTER_VALUE = "__all__";
+
 export default function FlightTicketsPage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [tickets, setTickets] = useState<FlightTicketRecord[]>([]);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalRows, setTotalRows] = useState(0);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -118,20 +149,86 @@ export default function FlightTicketsPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [draftFilters, setDraftFilters] = useState<Record<string, string>>({
     keyword: "",
+    functionCategory: "",
+    vesselName: "",
+    serviceMode: "",
+    provider: "",
+    status: "",
+  });
+  const [appliedFilters, setAppliedFilters] = useState<Record<string, string>>({
+    keyword: "",
+    functionCategory: "",
+    vesselName: "",
+    serviceMode: "",
+    provider: "",
+    status: "",
+  });
+  const [isVesselFilterOpen, setIsVesselFilterOpen] = useState(false);
+
+  const {
+    items: vesselFilterOptions,
+    loading: vesselFilterLoading,
+  } = useDebouncedRemoteSearch<VesselOption>({
+    query: draftFilters.vesselName ?? "",
+    enabled: isVesselFilterOpen,
+    delay: 400,
+    deps: [draftFilters.functionCategory ?? ""],
+    search: async (query, signal) => {
+      const searchParams = new URLSearchParams({
+        page: "1",
+        pageSize: "10",
+      });
+
+      if (query.trim()) {
+        searchParams.set("name", query.trim());
+      }
+
+      if ((draftFilters.functionCategory ?? "").trim()) {
+        searchParams.set("type", draftFilters.functionCategory.trim());
+      }
+
+      const response = await fetch(`/api/vessels?${searchParams.toString()}`, {
+        signal,
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to load vessels.");
+      }
+
+      const result = await response.json();
+      return Array.isArray(result.data) ? result.data : [];
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to load vessels",
+        description:
+          error instanceof Error ? error.message : "Unknown error occurred.",
+        variant: "destructive",
+      });
+    },
   });
 
   useEffect(() => {
     void loadTickets();
   }, []);
 
-  async function loadTickets(currentKeyword = "") {
+  async function loadTickets(
+    nextPage = page,
+    nextPageSize = pageSize,
+    filters = appliedFilters
+  ) {
     setLoading(true);
 
     try {
       const params = new URLSearchParams();
-      if (currentKeyword.trim()) {
-        params.set("keyword", currentKeyword.trim());
-      }
+      params.set("page", String(nextPage));
+      params.set("pageSize", String(nextPageSize));
+
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value.trim()) {
+          params.set(key, value.trim());
+        }
+      });
 
       const response = await fetch(`/api/flight-tickets?${params.toString()}`);
       if (!response.ok) {
@@ -140,6 +237,10 @@ export default function FlightTicketsPage() {
 
       const result = await response.json();
       setTickets(result.data ?? []);
+      setPage(result.meta?.page ?? nextPage);
+      setPageSize(result.meta?.pageSize ?? nextPageSize);
+      setTotalPages(result.meta?.totalPages ?? 1);
+      setTotalRows(result.meta?.total ?? 0);
     } catch (error) {
       toast({
         title: "Failed to load tickets",
@@ -188,8 +289,8 @@ export default function FlightTicketsPage() {
       setSelectedAssign("Sign On");
       setSelectedFunctionCategory("CMOS");
       setSelectedServiceMode("Flight");
-      setDraftFilters({ keyword });
-      await loadTickets(keyword);
+      setDraftFilters(appliedFilters);
+      await loadTickets(page, pageSize, appliedFilters);
       router.push(`/flight-tickets/${result.id}`);
     } catch (error) {
       toast({
@@ -226,6 +327,7 @@ export default function FlightTicketsPage() {
       }
 
       setTickets((current) => current.filter((ticket) => ticket.id !== ticketId));
+      await loadTickets(page, pageSize, appliedFilters);
       toast({
         title: "Flight ticket deleted",
         description: "The flight ticket has been removed successfully.",
@@ -245,11 +347,17 @@ export default function FlightTicketsPage() {
 
   const rows = useMemo<FlightTicketRow[]>(
     () =>
-      tickets.map((ticket) => {
+      tickets.map((ticket, index) => {
         const providerMeta = getFlightTicketProviderMeta(ticket.provider);
 
         return {
           ...ticket,
+          rowNumber: (page - 1) * pageSize + index + 1,
+          passengerNames:
+            ticket.passengers
+              .map((passenger) => passenger.name.trim())
+              .filter(Boolean)
+              .join(", ") || "-",
           functionCategoryDisplay:
             ticket.functionCategory === "CREWING_TANKER"
               ? "Crewing Tanker"
@@ -276,9 +384,28 @@ export default function FlightTicketsPage() {
   const columns = useMemo<DataColumn<FlightTicketRow>[]>(
     () => [
       {
+        key: "rowNumber",
+        title: "No",
+        widthClassName: "w-[80px]",
+      },
+      {
         key: "functionCategoryDisplay",
         title: "Fungsi",
         widthClassName: "w-[150px]",
+      },
+      {
+        key: "vesselName",
+        title: "Vessel Name",
+        widthClassName: "w-[180px]",
+        textClassName: "max-w-[180px]",
+        formatter: (value: unknown) => renderTruncatedCell(value, 3),
+      },
+      {
+        key: "passengerNames",
+        title: "Passenger",
+        widthClassName: "w-[240px]",
+        textClassName: "max-w-[240px]",
+        formatter: (value: unknown) => renderTruncatedCell(value, 5),
       },
       {
         key: "assign",
@@ -300,7 +427,7 @@ export default function FlightTicketsPage() {
       },
       {
         key: "bookingReference",
-        title: "Booking Reference",
+        title: "Reference Number",
         widthClassName: "w-[150px]",
         formatter: (value: unknown) => String(value ?? "-"),
       },
@@ -418,17 +545,191 @@ export default function FlightTicketsPage() {
             }
             onKeyDown={(event) => {
               if (event.key === "Enter") {
-                setKeyword(draftFilters.keyword ?? "");
-                void loadTickets(draftFilters.keyword ?? "");
+                const nextFilters = { ...draftFilters };
+                setAppliedFilters(nextFilters);
+                void loadTickets(1, pageSize, nextFilters);
               }
             }}
-            placeholder="Search by PNR, airline, or ticket number"
+            placeholder="Search by PNR, airline, ticket number, or reference number"
             className="h-[48px] rounded-[14px] border-[#d1d5db] bg-white px-4 text-[14px] text-[#111827] placeholder:text-[#94a3b8] focus-visible:ring-2 focus-visible:ring-[#6366f1]/30 dark:border-white/10 dark:bg-[#151d2c] dark:text-white dark:placeholder:text-[#64748b]"
           />
         </div>
+
+        <div className="space-y-2.5">
+          <Label className="text-[14px] font-medium text-[#374151] dark:text-[#d1d5db]">
+            Fungsi
+          </Label>
+          <Select
+            value={draftFilters.functionCategory || ALL_FILTER_VALUE}
+            onValueChange={(value) =>
+              setDraftFilters((current) => ({
+                ...current,
+                functionCategory:
+                  String(value) === ALL_FILTER_VALUE ? "" : String(value),
+                vesselName: "",
+              }))
+            }
+            items={[{ label: "All fungsi", value: ALL_FILTER_VALUE }, ...CATEGORY_OPTIONS]}
+          >
+            <SelectTrigger className="h-[48px] w-full rounded-[14px] border-[#d1d5db] bg-white px-4 text-[14px] text-[#111827] dark:border-white/10 dark:bg-[#151d2c] dark:text-white">
+              <SelectValue placeholder="Select fungsi" />
+              <SelectIcon />
+            </SelectTrigger>
+            <SelectPortal>
+              <SelectPositioner>
+                <SelectPopup>
+                  <SelectList>
+                    {[{ label: "All fungsi", value: ALL_FILTER_VALUE }, ...CATEGORY_OPTIONS].map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectList>
+                </SelectPopup>
+              </SelectPositioner>
+            </SelectPortal>
+          </Select>
+        </div>
+
+        <div className="space-y-2.5">
+          <SearchableSelect
+            label="Vessel Name"
+            value={draftFilters.vesselName ?? ""}
+            selectedId={draftFilters.vesselName ?? null}
+            loading={vesselFilterLoading}
+            open={isVesselFilterOpen}
+            options={vesselFilterOptions.map<SearchableSelectOption>((vessel) => ({
+              id: vessel.name,
+              label: vessel.name,
+              meta: vessel.type === "CREWING_TANKER" ? "Crewing Tanker" : vessel.type,
+            }))}
+            placeholder="Search vessel name"
+            onOpen={() => setIsVesselFilterOpen(true)}
+            onClose={() => setIsVesselFilterOpen(false)}
+            onChange={(value) =>
+              setDraftFilters((current) => ({
+                ...current,
+                vesselName: value,
+              }))
+            }
+            onSelect={(option) => {
+              setDraftFilters((current) => ({
+                ...current,
+                vesselName: option.label,
+              }));
+              setIsVesselFilterOpen(false);
+            }}
+            emptyText="No vessels found."
+          />
+        </div>
+
+        <div className="space-y-2.5">
+          <Label className="text-[14px] font-medium text-[#374151] dark:text-[#d1d5db]">
+            Service Mode
+          </Label>
+          <Select
+            value={draftFilters.serviceMode || ALL_FILTER_VALUE}
+            onValueChange={(value) =>
+              setDraftFilters((current) => ({
+                ...current,
+                serviceMode:
+                  String(value) === ALL_FILTER_VALUE ? "" : String(value),
+              }))
+            }
+            items={[{ label: "All service modes", value: ALL_FILTER_VALUE }, ...SERVICE_MODE_OPTIONS]}
+          >
+            <SelectTrigger className="h-[48px] w-full rounded-[14px] border-[#d1d5db] bg-white px-4 text-[14px] text-[#111827] dark:border-white/10 dark:bg-[#151d2c] dark:text-white">
+              <SelectValue placeholder="Select service mode" />
+              <SelectIcon />
+            </SelectTrigger>
+            <SelectPortal>
+              <SelectPositioner>
+                <SelectPopup>
+                  <SelectList>
+                    {[{ label: "All service modes", value: ALL_FILTER_VALUE }, ...SERVICE_MODE_OPTIONS].map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectList>
+                </SelectPopup>
+              </SelectPositioner>
+            </SelectPortal>
+          </Select>
+        </div>
+
+        <div className="space-y-2.5">
+          <Label className="text-[14px] font-medium text-[#374151] dark:text-[#d1d5db]">
+            Provider
+          </Label>
+          <Select
+            value={draftFilters.provider || ALL_FILTER_VALUE}
+            onValueChange={(value) =>
+              setDraftFilters((current) => ({
+                ...current,
+                provider:
+                  String(value) === ALL_FILTER_VALUE ? "" : String(value),
+              }))
+            }
+            items={[{ label: "All providers", value: ALL_FILTER_VALUE }, ...PROVIDER_FILTER_OPTIONS]}
+          >
+            <SelectTrigger className="h-[48px] w-full rounded-[14px] border-[#d1d5db] bg-white px-4 text-[14px] text-[#111827] dark:border-white/10 dark:bg-[#151d2c] dark:text-white">
+              <SelectValue placeholder="Select provider" />
+              <SelectIcon />
+            </SelectTrigger>
+            <SelectPortal>
+              <SelectPositioner>
+                <SelectPopup>
+                  <SelectList>
+                    {[{ label: "All providers", value: ALL_FILTER_VALUE }, ...PROVIDER_FILTER_OPTIONS].map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectList>
+                </SelectPopup>
+              </SelectPositioner>
+            </SelectPortal>
+          </Select>
+        </div>
+
+        <div className="space-y-2.5">
+          <Label className="text-[14px] font-medium text-[#374151] dark:text-[#d1d5db]">
+            Status
+          </Label>
+          <Select
+            value={draftFilters.status || ALL_FILTER_VALUE}
+            onValueChange={(value) =>
+              setDraftFilters((current) => ({
+                ...current,
+                status:
+                  String(value) === ALL_FILTER_VALUE ? "" : String(value),
+              }))
+            }
+            items={[{ label: "All status", value: ALL_FILTER_VALUE }, ...STATUS_OPTIONS]}
+          >
+            <SelectTrigger className="h-[48px] w-full rounded-[14px] border-[#d1d5db] bg-white px-4 text-[14px] text-[#111827] dark:border-white/10 dark:bg-[#151d2c] dark:text-white">
+              <SelectValue placeholder="Select status" />
+              <SelectIcon />
+            </SelectTrigger>
+            <SelectPortal>
+              <SelectPositioner>
+                <SelectPopup>
+                  <SelectList>
+                    {[{ label: "All status", value: ALL_FILTER_VALUE }, ...STATUS_OPTIONS].map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectList>
+                </SelectPopup>
+              </SelectPositioner>
+            </SelectPortal>
+          </Select>
+        </div>
       </div>
     ),
-    [draftFilters.keyword]
+    [draftFilters, pageSize]
   );
 
   return (
@@ -441,24 +742,74 @@ export default function FlightTicketsPage() {
         rows={rows}
         loading={loading}
         rowKey={(row) => row.id}
+        currentPage={page}
+        currentPageSize={pageSize}
+        totalPages={totalPages}
+        totalRows={totalRows}
+        serverSideFiltering
+        serverSidePagination
+        onPageChange={(nextPage) => {
+          void loadTickets(nextPage, pageSize, appliedFilters);
+        }}
+        onPageSizeChange={(nextPageSize) => {
+          void loadTickets(1, nextPageSize, appliedFilters);
+        }}
         filterFields={[
           {
             key: "keyword",
             label: "Keyword",
-            placeholder: "Search by PNR, airline, or ticket number",
+            placeholder: "Search by PNR, airline, ticket number, or reference number",
+          },
+          {
+            key: "functionCategory",
+            label: "Fungsi",
+          },
+          {
+            key: "vesselName",
+            label: "Vessel Name",
+            placeholder: "Search vessel name",
+          },
+          {
+            key: "serviceMode",
+            label: "Service Mode",
+          },
+          {
+            key: "provider",
+            label: "Provider",
+          },
+          {
+            key: "status",
+            label: "Status",
           },
         ]}
         filterValues={draftFilters}
         onFilterValuesChange={setDraftFilters}
         onApplyFilters={(values) => {
-          const nextKeyword = values.keyword ?? "";
-          setKeyword(nextKeyword);
-          void loadTickets(nextKeyword);
+          const nextFilters = {
+            keyword: values.keyword ?? "",
+            functionCategory: values.functionCategory ?? "",
+            vesselName: values.vesselName ?? "",
+            serviceMode: values.serviceMode ?? "",
+            provider: values.provider ?? "",
+            status: values.status ?? "",
+          };
+          setAppliedFilters(nextFilters);
+          setKeyword(nextFilters.keyword);
+          void loadTickets(1, pageSize, nextFilters);
         }}
         onResetFilters={() => {
-          setDraftFilters({ keyword: "" });
+          const clearedFilters = {
+            keyword: "",
+            functionCategory: "",
+            vesselName: "",
+            serviceMode: "",
+            provider: "",
+            status: "",
+          };
+          setDraftFilters(clearedFilters);
+          setAppliedFilters(clearedFilters);
           setKeyword("");
-          void loadTickets("");
+          void loadTickets(1, pageSize, clearedFilters);
         }}
         filterContent={filterContent}
         primaryAction={{

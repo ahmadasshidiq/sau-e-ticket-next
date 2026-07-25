@@ -77,6 +77,7 @@ model Vessel {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   invoiceItems InvoiceItem[]
+  flightTickets FlightTicket[]
 }
 
 model Rank {
@@ -85,6 +86,7 @@ model Rank {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   invoiceItems InvoiceItem[]
+  passengers  Passenger[]
 }
 
 model Invoice {
@@ -131,6 +133,8 @@ model InvoiceItem {
 model FlightTicket {
   id                String      @id @default(cuid())
   functionCategory  VesselType?
+  vesselId          String?
+  vessel            Vessel?     @relation(fields: [vesselId], references: [id])
   assign            String?
   serviceMode       String?
   bookingReference  String?     @unique
@@ -156,7 +160,6 @@ model FlightTicket {
   arrivalTime       String?
   duration          String?
   currency          String? @default("IDR")
-  fare              Decimal?     @db.Decimal(18, 2)
   farePerPax        Decimal?     @db.Decimal(18, 2)
   quantity          Int?         @default(1)
   tax               Decimal?     @db.Decimal(18, 2)
@@ -173,16 +176,20 @@ model FlightTicket {
   @@index([departureDate])
   @@index([provider])
   @@index([status])
+  @@index([vesselId])
 }
 
 model Passenger {
   id             String       @id @default(cuid())
   flightTicketId String
   flightTicket   FlightTicket @relation(fields: [flightTicketId], references: [id], onDelete: Cascade)
+  rankId         String?
+  rank           Rank?        @relation(fields: [rankId], references: [id])
   title          String?
   name           String
   passengerType  String?
   baggage        String?
   ticketNumber   String?
   createdAt      DateTime @default(now())
+  @@index([rankId])
 }
