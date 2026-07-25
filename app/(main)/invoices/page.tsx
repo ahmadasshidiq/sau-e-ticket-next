@@ -63,7 +63,7 @@ type InvoiceForm = {
 };
 
 const fieldClassName =
-  "h-[46px] rounded-[14px] border-[#d1d5db] bg-white px-4 text-[14px] text-[#111827] placeholder:text-[#9ca3af] focus-visible:border-[#4438ff] focus-visible:ring-[color:rgba(68,56,255,0.12)] dark:border-white/10 dark:bg-[#151d2c] dark:text-white dark:placeholder:text-[#64748b]";
+  "h-[46px] rounded-[14px] border-[#d1d5db] bg-white px-4 text-[14px] text-[#111827] placeholder:text-[#9ca3af] focus-visible:border-[#4438ff] focus-visible:ring-[color:rgba(68,56,255,0.12)] dark:border-white/10 dark:bg-[#151d2c] dark:text-white dark:placeholder:text-[#64748b] dark:[color-scheme:dark] dark:[&::-webkit-calendar-picker-indicator]:cursor-pointer dark:[&::-webkit-calendar-picker-indicator]:opacity-85 dark:[&::-webkit-calendar-picker-indicator]:invert dark:[&::-webkit-calendar-picker-indicator]:brightness-200";
 
 const defaultForm: InvoiceForm = {
   vesselId: "",
@@ -294,17 +294,17 @@ export default function InvoicesPage() {
             />
           </div>
 
-          <div className="mt-6 rounded-[24px] border border-[#dbe4ff] bg-[linear-gradient(135deg,#f8faff_0%,#eef2ff_100%)] p-5 dark:border-[#312e81] dark:bg-[linear-gradient(135deg,rgba(30,27,75,0.72)_0%,rgba(17,24,39,0.92)_100%)]">
+          <div className="mt-6 rounded-[24px] border border-[#dbe4ff] bg-[linear-gradient(135deg,#f8faff_0%,#eef2ff_100%)] p-5 dark:border-[#2a3550] dark:bg-[linear-gradient(135deg,rgba(21,29,44,0.98)_0%,rgba(17,24,39,0.94)_100%)]">
             <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h3 className="text-[16px] font-semibold text-[#1e3a8a] dark:text-[#c7d2fe]">
+                <h3 className="text-[16px] font-semibold text-[#1e3a8a] dark:text-[#dbe7ff]">
                   Customer Detail
                 </h3>
-                <p className="mt-1 text-sm text-[#5b6b8a] dark:text-[#a5b4fc]">
+                <p className="mt-1 text-sm text-[#5b6b8a] dark:text-[#93a4c3]">
                   Make sure the customer invoice data is correct before previewing or generating it.
                 </p>
               </div>
-              <div className="rounded-full border border-[#c7d2fe] bg-white/80 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#4f46e5] dark:border-[#4338ca] dark:bg-[#1f2540] dark:text-[#a5b4fc]">
+              <div className="rounded-full border border-[#c7d2fe] bg-white/80 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#4f46e5] dark:border-[#31415f] dark:bg-[#182235] dark:text-[#a9bad8]">
                 Highlight
               </div>
             </div>

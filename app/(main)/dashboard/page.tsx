@@ -421,21 +421,14 @@ function ClientPanel({
   return (
     <article className="rounded-[22px] border border-[#e6e6e6] bg-white shadow-[0_4px_14px_rgba(15,23,42,0.02)] dark:border-white/10 dark:bg-[#111827] dark:shadow-[0_16px_32px_rgba(2,6,23,0.28)]">
       <div className="border-b border-[#ececec] px-6 py-5 dark:border-white/10">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-3">
-              <div className="min-w-0">
-                <h2 className="text-[24px] font-bold tracking-[-0.03em] text-[#1e1e1e] dark:text-white">
-                  {client.title} ({client.key})
-                </h2>
-                <p className="mt-1 max-w-[420px] text-[14px] leading-[1.45] text-[#8d8d8d] dark:text-[#94a3b8]">
-                  YTD Tickets {client.totalTickets} | YTD Value {formatCurrency(client.totalAmount)}
-                </p>
-              </div>
-            </div>
+        <div className="space-y-4">
+          <div className="min-w-0">
+            <h2 className="text-[22px] font-semibold tracking-[-0.03em] text-[#1e1e1e] dark:text-white">
+              {client.title} ({client.key})
+            </h2>
           </div>
 
-          <div className="grid shrink-0 gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-2">
             <InlineMetric label="YTD Tickets" value={String(client.totalTickets)} />
             <InlineMetric label="YTD Value" value={formatCurrency(client.totalAmount)} accent />
           </div>
@@ -498,7 +491,7 @@ function InlineMetric({
 }) {
   return (
     <div
-      className={`rounded-[18px] border px-4 py-3 ${
+      className={`rounded-[18px] border px-5 py-4 ${
         accent
           ? "border-[#d7f0de] bg-[#f4fbf6] dark:border-[#214b31] dark:bg-[#0f1e16]"
           : "border-[#ececec] bg-[#fafafa] dark:border-white/10 dark:bg-[#0f172a]"
