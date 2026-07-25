@@ -375,6 +375,9 @@ export default function FlightTicketsPage() {
             day: "2-digit",
             month: "short",
             year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: false,
           }).format(new Date(ticket.createdAt)),
         };
       }),
@@ -387,6 +390,12 @@ export default function FlightTicketsPage() {
         key: "rowNumber",
         title: "No",
         widthClassName: "w-[80px]",
+      },
+      {
+        key: "bookingReference",
+        title: "Reference Number",
+        widthClassName: "w-[180px]",
+        formatter: (value: unknown) => String(value ?? "-"),
       },
       {
         key: "functionCategoryDisplay",
@@ -403,9 +412,9 @@ export default function FlightTicketsPage() {
       {
         key: "passengerNames",
         title: "Passenger",
-        widthClassName: "w-[240px]",
-        textClassName: "max-w-[240px]",
-        formatter: (value: unknown) => renderTruncatedCell(value, 5),
+        widthClassName: "w-[380px]",
+        textClassName: "max-w-[380px]",
+        formatter: (value: unknown) => renderTruncatedCell(value, 6),
       },
       {
         key: "assign",
@@ -423,12 +432,6 @@ export default function FlightTicketsPage() {
         key: "pnr",
         title: "PNR",
         widthClassName: "w-[110px]",
-        formatter: (value: unknown) => String(value ?? "-"),
-      },
-      {
-        key: "bookingReference",
-        title: "Reference Number",
-        widthClassName: "w-[150px]",
         formatter: (value: unknown) => String(value ?? "-"),
       },
       {
@@ -493,7 +496,7 @@ export default function FlightTicketsPage() {
       {
         key: "createdAtDisplay",
         title: "Created At",
-        widthClassName: "w-[120px]",
+        widthClassName: "w-[180px]",
         textClassName: "whitespace-nowrap",
       },
       {

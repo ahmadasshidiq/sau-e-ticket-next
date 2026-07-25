@@ -122,6 +122,20 @@ function computeGrandTotal(
   return String(normalizedFare * normalizedQuantity);
 }
 
+function resolvePassengerQuantity(passengers: Passenger[] | null | undefined) {
+  return Math.max(passengers?.length ?? 0, 1);
+}
+
+function syncTicketPassengerQuantity(ticket: FlightTicketDetail): FlightTicketDetail {
+  const quantity = resolvePassengerQuantity(ticket.passengers);
+
+  return {
+    ...ticket,
+    quantity,
+    grandTotal: computeGrandTotal(ticket.farePerPax, quantity),
+  };
+}
+
 function reindexPassengerMap<T>(source: Record<number, T>, removedIndex: number) {
   return Object.entries(source).reduce<Record<number, T>>((accumulator, entry) => {
     const index = Number(entry[0]);
@@ -188,7 +202,7 @@ export default function ValidateFlightTicketPage() {
         return response.json();
       })
       .then((result) => {
-        setTicket(result);
+        setTicket(syncTicketPassengerQuantity(result as FlightTicketDetail));
         setVesselSearch(result.vesselName ?? "");
         setRankSearches(
           Array.isArray(result.passengers)
@@ -332,14 +346,10 @@ export default function ValidateFlightTicketPage() {
 
       const nextTicket = { ...current, [key]: value };
 
-      if (key === "farePerPax" || key === "quantity") {
+      if (key === "farePerPax") {
         nextTicket.grandTotal = computeGrandTotal(
-          key === "farePerPax"
-            ? (value as FlightTicketDetail["farePerPax"])
-            : nextTicket.farePerPax,
-          key === "quantity"
-            ? (value as FlightTicketDetail["quantity"])
-            : nextTicket.quantity
+          value as FlightTicketDetail["farePerPax"],
+          nextTicket.quantity
         );
       }
 
@@ -357,10 +367,10 @@ export default function ValidateFlightTicketPage() {
         [key]: value,
       };
 
-      return {
+      return syncTicketPassengerQuantity({
         ...current,
         passengers: nextPassengers,
-      };
+      });
     });
   }
 
@@ -372,10 +382,10 @@ export default function ValidateFlightTicketPage() {
         return current;
       }
 
-      return {
+      return syncTicketPassengerQuantity({
         ...current,
         passengers: current.passengers.filter((_, passengerIndex) => passengerIndex !== index),
-      };
+      });
     });
 
     setRankSearches((current) => reindexPassengerMap(current, index));
@@ -722,10 +732,10 @@ export default function ValidateFlightTicketPage() {
                   onClick={() =>
                     setTicket((current) =>
                       current
-                        ? {
-                          ...current,
-                          passengers: [...current.passengers, { ...emptyPassenger }],
-                        }
+                        ? syncTicketPassengerQuantity({
+                            ...current,
+                            passengers: [...current.passengers, { ...emptyPassenger }],
+                          })
                         : current
                     )
                   }
@@ -894,10 +904,9 @@ export default function ValidateFlightTicketPage() {
                 <Field
                   label="Quantity"
                   value={String(ticket.quantity ?? 1)}
-                  onChange={(value) =>
-                    updateField("quantity", Number(value || "0") || 0)
-                  }
+                  onChange={() => undefined}
                   type="number"
+                  readOnly
                 />
                 <CurrencyField
                   label="Grand Total"
@@ -946,12 +955,14 @@ function Field({
   onChange,
   type = "text",
   readOnly = false,
+  disabled = false,
 }: {
   label: string;
   value: string | null | undefined;
   onChange: (value: string) => void;
   type?: string;
   readOnly?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <div className="space-y-2.5">
@@ -961,7 +972,12 @@ function Field({
         value={value ?? ""}
         onChange={(event) => onChange(event.target.value)}
         readOnly={readOnly}
-        className={readOnly ? `${fieldClassName} bg-[#f8fafc] text-[#6b7280] dark:bg-[#0f172a] dark:text-[#94a3b8]` : fieldClassName}
+        disabled={disabled}
+        className={
+          readOnly || disabled
+            ? `${fieldClassName} bg-[#f8fafc] text-[#6b7280] dark:bg-[#0f172a] dark:text-[#94a3b8]`
+            : fieldClassName
+        }
       />
     </div>
   );

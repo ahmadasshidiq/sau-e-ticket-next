@@ -429,30 +429,30 @@ export async function buildInvoicePdfHtml(filters: InvoiceGeneratorFilters) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Invoice ${escapeHtml(preview.meta.invoiceNumber || preview.meta.consolidatedInvoiceNumber || "Draft")}</title>
   <style>
-    @page { size: A4 landscape; margin: 18mm; }
+    @page { size: A4 landscape; margin: 14mm; }
     * { box-sizing: border-box; }
     body { margin: 0; font-family: Arial, Helvetica, sans-serif; color: #111827; background: #fff; }
     .sheet { width: 100%; }
-    .header { display: grid; grid-template-columns: 1fr 1fr 1fr; align-items: start; gap: 16px; margin-bottom: 26px; }
-    .billto { font-size: 14px; line-height: 1.55; }
-    .billto strong { display: block; margin-bottom: 12px; }
-    .title { text-align: center; font-size: 18px; font-weight: 700; margin-top: 24px; }
-    .meta { text-align: right; font-size: 14px; line-height: 1.8; font-weight: 700; }
-    .vessel-bar { display: grid; grid-template-columns: 240px 24px 1fr; width: 520px; margin: 18px 0 22px; background: #f3f4f6; }
-    .vessel-bar div { padding: 4px 8px; font-size: 14px; font-weight: 700; }
+    .header { display: grid; grid-template-columns: 1fr 1fr 1fr; align-items: start; gap: 16px; margin-bottom: 18px; }
+    .billto { font-size: 12px; line-height: 1.55; }
+    .billto strong { display: block; margin-bottom: 9px; }
+    .title { text-align: center; font-size: 17px; font-weight: 700; margin-top: 18px; }
+    .meta { text-align: right; font-size: 12px; line-height: 1.65; font-weight: 700; }
+    .vessel-bar { display: grid; grid-template-columns: 220px 20px 1fr; width: 500px; margin: 14px 0 18px; background: #f3f4f6; }
+    .vessel-bar div { padding: 5px 9px; font-size: 12px; font-weight: 700; }
     table { width: 100%; border-collapse: collapse; }
-    th, td { border: 1px solid #2d3748; padding: 8px 10px; font-size: 13px; }
-    th { background: #c7d7f2; text-align: center; font-size: 12px; }
+    th, td { border: 1px solid #2d3748; padding: 7px 10px; font-size: 11px; }
+    th { background: #c7d7f2; text-align: center; font-size: 11px; }
     td { vertical-align: top; }
     .group-row td { background: #eef2ff; font-weight: 700; color: #1e3a8a; }
     td.right { text-align: right; white-space: nowrap; }
     td.center { text-align: center; }
     .total-row td { background: #c7d7f2; font-weight: 700; }
     .empty { text-align: center; color: #6b7280; padding: 20px; }
-    .notes { margin-top: 26px; font-size: 13px; line-height: 1.65; }
-    .notes strong { font-size: 14px; }
-    .bank { margin-top: 24px; font-size: 13px; line-height: 1.8; }
-    .footer { margin-top: 28px; text-align: center; font-size: 11px; color: #374151; }
+    .notes { margin-top: 18px; font-size: 11px; line-height: 1.55; }
+    .notes strong { font-size: 12px; }
+    .bank { margin-top: 16px; font-size: 11px; line-height: 1.65; }
+    .footer { margin-top: 20px; text-align: center; font-size: 10px; color: #374151; }
   </style>
 </head>
 <body>

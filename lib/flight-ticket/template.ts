@@ -33,6 +33,7 @@ type FlightTicketLike = {
   arrivalTime?: string | null;
   duration?: string | null;
   serviceMode?: string | null;
+  farePerPax?: string | null;
   grandTotal?: string | number | null;
   provider?: string | null;
   passengers?: PassengerLike[];
@@ -280,8 +281,6 @@ function renderServiceModeIcon(serviceMode: string | null | undefined) {
 export function renderFlightTicketHtml(ticket: FlightTicketLike) {
   const provider = getFlightTicketProviderMeta(ticket.provider);
   const passengers = ticket.passengers ?? [];
-  const departure = splitAirport(ticket.departureAirport);
-  const arrival = splitAirport(ticket.arrivalAirport);
   const departureDisplay = formatAirportDisplay(ticket.departureAirport);
   const arrivalDisplay = formatAirportDisplay(ticket.arrivalAirport);
   const departureCityDisplay = splitAirport(ticket.departureCity);
@@ -698,7 +697,7 @@ export function renderFlightTicketHtml(ticket: FlightTicketLike) {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            padding: 18px 20px 14px;
+            padding: 16px 20px 14px;
             background: var(--brand-blue-softest);
         }
 
@@ -709,7 +708,7 @@ export function renderFlightTicketHtml(ticket: FlightTicketLike) {
 
         .fare-row .left strong {
             display: block;
-            font-size: 18px;
+            font-size: 16px;
         }
 
         .fare-row .left span {
@@ -719,12 +718,12 @@ export function renderFlightTicketHtml(ticket: FlightTicketLike) {
         }
 
         .fare-row .right {
-            font-size: 18px;
+            font-size: 16px;
             font-weight: 700;
         }
 
         .fare-row.total .right {
-            font-size: 18px;
+            font-size: 16px;
             color: #111827;
         }
 
@@ -852,7 +851,7 @@ export function renderFlightTicketHtml(ticket: FlightTicketLike) {
         }
 
         .stop .time {
-            font-size: 26px;
+            font-size: 20px;
             font-weight: 700;
             color: #111;
             display: flex;
@@ -1000,7 +999,7 @@ export function renderFlightTicketHtml(ticket: FlightTicketLike) {
                     <div class="stop departure">
                         <div style="line-height:1.3;">
                             <div style="font-size:13px; color:${"var(--brand-blue)"}; font-weight:700;">${escapeHtml(departureDay)}</div>
-                            <div style="font-size:20px; color:${"var(--brand-blue)"}; font-weight:700; margin-top:2px;">${escapeHtml(departureDate)}</div>
+                            <div style="font-size:16px; color:${"var(--brand-blue)"}; font-weight:700; margin-top:2px;">${escapeHtml(departureDate)}</div>
                         </div>
                         <div class="time" style="justify-content:flex-start; margin-top:4px;">${escapeHtml(departureTime)}</div>
                         <div class="airport">${escapeHtml(departureCityDisplay.city.toUpperCase())}${
@@ -1024,7 +1023,7 @@ export function renderFlightTicketHtml(ticket: FlightTicketLike) {
                         </div>
                     </div>
 
-                    <div class="duration" style="margin-top: 3.5rem">
+                    <div class="duration" style="margin-top: 2.8rem">
                         <div class="label">
                             <div class="en">${escapeHtml(duration.primary)}</div>
                         </div>
@@ -1040,7 +1039,7 @@ export function renderFlightTicketHtml(ticket: FlightTicketLike) {
                     <div class="stop arrival">
                         <div style="line-height:1.3; text-align:right;">
                             <div style="font-size:13px; color:${"var(--brand-blue)"}; font-weight:700; margin-top:2px;">${escapeHtml(arrivalDay)}</div>
-                            <div style="font-size:20px; color:${"var(--brand-blue)"}; font-weight:700;">${escapeHtml(arrivalDate)}</div>
+                            <div style="font-size:16px; color:${"var(--brand-blue)"}; font-weight:700;">${escapeHtml(arrivalDate)}</div>
                         </div>
                         <div class="time" style="justify-content:flex-end; margin-top:4px;">${escapeHtml(arrivalTime)}</div>
                         <div class="airport">${escapeHtml(arrivalCityDisplay.city.toUpperCase())}${
@@ -1102,9 +1101,9 @@ export function renderFlightTicketHtml(ticket: FlightTicketLike) {
             <div class="fare-box">
                 <div class="fare-row">
                     <div class="left">
-                        <strong>Ticket for ${Math.max(passengers.length, 1)} passenger</strong>
+                        <strong>Ticket for 1 passenger</strong>
                     </div>
-                    <div class="right">${escapeHtml(formatMoney(ticket.grandTotal))}</div>
+                    <div class="right">${escapeHtml(formatMoney(ticket.farePerPax))}</div>
                 </div>
 
                 <div class="fare-row total">
