@@ -55,6 +55,7 @@ export async function GET(
       ? cached.html
       : renderFlightTicketHtml({
           ...ticket,
+          farePerPax: ticket.farePerPax?.toString() ?? null,
           grandTotal: ticket.grandTotal?.toString() ?? null,
         });
 
