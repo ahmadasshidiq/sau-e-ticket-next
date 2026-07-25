@@ -73,10 +73,9 @@ const defaultForm: InvoiceForm = {
   consolidatedInvoiceNumber: "",
   invoiceDate: "",
   dueDate: "",
-  customer: "PT. PERTAMINA MARINE SOLUTIONS",
-  customerAddress:
-    "Jl. Yos Sudarso No.34, RT.19/RW.14, Rawa Badak Utara, Tanjung Priok, Jakarta Utara 14320",
-  customerPhone: "Telp : 021 - 653 07030",
+  customer: "",
+  customerAddress: "",
+  customerPhone: "",
 };
 
 function buildSearchParams(form: InvoiceForm) {
