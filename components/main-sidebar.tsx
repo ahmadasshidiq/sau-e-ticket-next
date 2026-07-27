@@ -9,6 +9,7 @@ import {
   Cancel01Icon,
   Home01Icon,
   Invoice01Icon,
+  Download01Icon,
   AirplaneLanding01Icon,
   Settings05Icon,
   UserMultipleIcon,
@@ -35,6 +36,7 @@ const mainItems: NavItem[] = [
 const documentItems: NavItem[] = [
   { label: "Flight Ticket", href: "/flight-tickets", icon: AirplaneLanding01Icon },
   { label: "Invoice", href: "/invoices", icon: Invoice01Icon },
+  { label: "Download Data", href: "/download-data", icon: Download01Icon },
 ];
 
 const systemItems: NavItem[] = [

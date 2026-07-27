@@ -12,7 +12,8 @@ function isProtectedPath(pathname: string) {
     pathname.startsWith("/ranks") ||
     pathname.startsWith("/settings") ||
     pathname.startsWith("/invoices") ||
-    pathname.startsWith("/flight-tickets")
+    pathname.startsWith("/flight-tickets") ||
+    pathname.startsWith("/download-data")
   );
 }
 

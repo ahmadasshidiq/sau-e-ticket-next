@@ -355,25 +355,6 @@ export default function InvoicesPage() {
             <Button
               type="button"
               variant="outline"
-              onClick={() => void handleExportCsv()}
-              disabled={exportingCsv || loadingVessels}
-              className="h-[46px] rounded-[14px] border-[#d1d5db] px-5"
-            >
-              {exportingCsv ? (
-                <>
-                  <HugeiconsIcon icon={Loading03Icon} size={18} className="animate-spin" />
-                  Exporting...
-                </>
-              ) : (
-                <>
-                  <HugeiconsIcon icon={Download01Icon} size={18} strokeWidth={1.8} />
-                  Generate Excel Table
-                </>
-              )}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
               onClick={handleGeneratePdf}
               disabled={loadingVessels}
               className="h-[46px] rounded-[14px] border-[#d1d5db] px-5"
