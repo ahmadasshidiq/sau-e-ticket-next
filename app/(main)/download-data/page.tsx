@@ -31,30 +31,19 @@ const functionOptions = [
 ] as const;
 
 const availableColumns = [
-  { key: "no", label: "No" },
-  { key: "vesselName", label: "Vessel Name" },
-  { key: "passengerName", label: "Passenger Name" },
-  { key: "assign", label: "Assign" },
-  { key: "serviceMode", label: "Service Mode" },
-  { key: "pnr", label: "PNR" },
-  { key: "provider", label: "Provider" },
-  { key: "airline", label: "Airline" },
-  { key: "ticketNumber", label: "Ticket Number" },
-  { key: "rank", label: "Rank" },
-  { key: "title", label: "Title" },
   { key: "bookingReference", label: "Booking Reference" },
-  { key: "departureDate", label: "Departure Date" },
-  { key: "arrivalDate", label: "Arrival Date" },
-  { key: "departureCity", label: "Departure City" },
-  { key: "arrivalCity", label: "Arrival City" },
-  { key: "departureAirport", label: "Departure Airport" },
-  { key: "arrivalAirport", label: "Arrival Airport" },
-  { key: "flightNumber", label: "Flight Number" },
-  { key: "cabinClass", label: "Cabin Class" },
-  { key: "farePerPax", label: "Fare / Pax" },
-  { key: "grandTotal", label: "Grand Total" },
+  { key: "docDate", label: "Doc Date" },
+  { key: "passengerName", label: "Passenger Name" },
+  { key: "rank", label: "Rank" },
+  { key: "vesselName", label: "Vessel" },
   { key: "status", label: "Status" },
-  { key: "functionCategory", label: "Function" },
+  { key: "serviceArea", label: "Service Area" },
+  { key: "serviceMode", label: "Service Mode" },
+  { key: "serviceDetail", label: "Service Detail" },
+  { key: "serviceDate", label: "Service Date" },
+  { key: "serviceProvider", label: "Service Provider" },
+  { key: "fare", label: "Fare" },
+  { key: "ntaFare", label: "NTA Fare" },
 ] as const;
 
 type ColumnKey = (typeof availableColumns)[number]["key"];
@@ -79,14 +68,19 @@ type DownloadDataForm = {
 };
 
 const defaultColumns: ColumnKey[] = [
-  "no",
-  "vesselName",
+  "bookingReference",
+  "docDate",
   "passengerName",
-  "assign",
+  "rank",
+  "vesselName",
+  "status",
+  "serviceArea",
   "serviceMode",
-  "pnr",
-  "provider",
-  "airline",
+  "serviceDetail",
+  "serviceDate",
+  "serviceProvider",
+  "fare",
+  "ntaFare",
 ];
 
 const defaultForm: DownloadDataForm = {
@@ -96,7 +90,7 @@ const defaultForm: DownloadDataForm = {
   columns: defaultColumns,
 };
 
-const DOWNLOAD_DATA_COLUMNS_STORAGE_KEY = "download-data-selected-columns";
+const DOWNLOAD_DATA_COLUMNS_STORAGE_KEY = "download-data-selected-columns-v2";
 
 function buildSearchParams(form: DownloadDataForm) {
   const searchParams = new URLSearchParams();

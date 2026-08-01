@@ -44,6 +44,7 @@ type FlightTicketDetail = {
   assign: "Sign On" | "Sign Off" | null;
   serviceMode: "Flight" | "Train" | "Bus" | null;
   bookingReference: string | null;
+  docDate: string | null;
   provider: string | null;
   status: "DRAFT" | "GENERATED";
   pnr: string | null;
@@ -63,6 +64,7 @@ type FlightTicketDetail = {
   arrivalTime: string | null;
   duration: string | null;
   farePerPax: string | null;
+  ntaFare: string | null;
   quantity: number;
   grandTotal: string | null;
   selectedFlightOptionKey: string | null;
@@ -658,6 +660,12 @@ export default function ValidateFlightTicketPage() {
                   value={ticket.bookingReference}
                   onChange={(value) => updateField("bookingReference", value)}
                 />
+                <Field
+                  label="Doc Date"
+                  type="date"
+                  value={ticket.docDate ? ticket.docDate.slice(0, 10) : ""}
+                  onChange={(value) => updateField("docDate", value || null)}
+                />
               </div>
             </section>
 
@@ -892,15 +900,22 @@ export default function ValidateFlightTicketPage() {
               <div className="mb-5">
                 <h2 className="text-lg font-semibold text-[#111827] dark:text-white">Fare Detail</h2>
                 <p className="mt-1 text-sm text-[#6b7280] dark:text-[#94a3b8]">
-                  Confirm fare per passenger, quantity, and grand total before generating the document.
+                  Fare per Pax is the ticket selling price. NTA Fare is the ticket purchase price and is for internal records only.
                 </p>
               </div>
               <div className="grid gap-5 xl:grid-cols-3">
-                <CurrencyField
-                  label="Fare per Pax"
-                  value={ticket.farePerPax}
-                  onChange={(value) => updateField("farePerPax", value)}
-                />
+                <div className="space-y-5">
+                  <CurrencyField
+                    label="Fare per Pax"
+                    value={ticket.farePerPax}
+                    onChange={(value) => updateField("farePerPax", value)}
+                  />
+                  <CurrencyField
+                    label="NTA Fare"
+                    value={ticket.ntaFare}
+                    onChange={(value) => updateField("ntaFare", value)}
+                  />
+                </div>
                 <Field
                   label="Quantity"
                   value={String(ticket.quantity ?? 1)}

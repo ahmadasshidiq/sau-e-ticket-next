@@ -71,7 +71,16 @@ function parseCuePassenger(items: PdfTextItem[]): PassengerDto[] {
   const withoutTitle = rawTitle
     ? rawName.replace(new RegExp(`(?:\\s+|/)${rawTitle}$`, "i"), "")
     : rawName;
-  const name = normalizeWhitespace(withoutTitle.replace(/\//g, " "));
+  const cueNameParts = withoutTitle
+    .split("/")
+    .map((part) => normalizeWhitespace(part))
+    .filter(Boolean);
+  const name =
+    cueNameParts.length >= 2
+      ? normalizeWhitespace(
+          `${cueNameParts.slice(1).join(" ")} ${cueNameParts[0]}`
+        )
+      : normalizeWhitespace(withoutTitle);
 
   return name
     ? [

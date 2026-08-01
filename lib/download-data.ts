@@ -1,32 +1,22 @@
 import { VesselType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { toCsvRow } from "@/lib/csv";
+import type { FlightOption } from "@/lib/flight-ticket/flight-options";
 
 export const DOWNLOAD_DATA_COLUMNS = [
-  { key: "no", label: "No" },
-  { key: "vesselName", label: "Vessel Name" },
-  { key: "passengerName", label: "Passenger Name" },
-  { key: "assign", label: "Assign" },
-  { key: "serviceMode", label: "Service Mode" },
-  { key: "pnr", label: "PNR" },
-  { key: "provider", label: "Provider" },
-  { key: "airline", label: "Airline" },
-  { key: "ticketNumber", label: "Ticket Number" },
-  { key: "rank", label: "Rank" },
-  { key: "title", label: "Title" },
   { key: "bookingReference", label: "Booking Reference" },
-  { key: "departureDate", label: "Departure Date" },
-  { key: "arrivalDate", label: "Arrival Date" },
-  { key: "departureCity", label: "Departure City" },
-  { key: "arrivalCity", label: "Arrival City" },
-  { key: "departureAirport", label: "Departure Airport" },
-  { key: "arrivalAirport", label: "Arrival Airport" },
-  { key: "flightNumber", label: "Flight Number" },
-  { key: "cabinClass", label: "Cabin Class" },
-  { key: "farePerPax", label: "Fare / Pax" },
-  { key: "grandTotal", label: "Grand Total" },
+  { key: "docDate", label: "Doc Date" },
+  { key: "passengerName", label: "Passenger Name" },
+  { key: "rank", label: "Rank" },
+  { key: "vesselName", label: "Vessel" },
   { key: "status", label: "Status" },
-  { key: "functionCategory", label: "Function" },
+  { key: "serviceArea", label: "Service Area" },
+  { key: "serviceMode", label: "Service Mode" },
+  { key: "serviceDetail", label: "Service Detail" },
+  { key: "serviceDate", label: "Service Date" },
+  { key: "serviceProvider", label: "Service Provider" },
+  { key: "fare", label: "Fare" },
+  { key: "ntaFare", label: "NTA Fare" },
 ] as const;
 
 export type DownloadDataColumnKey = (typeof DOWNLOAD_DATA_COLUMNS)[number]["key"];
@@ -73,18 +63,6 @@ function formatDisplayDate(value?: string | Date | null) {
   }).format(date);
 }
 
-function formatDateTime(value?: Date | null) {
-  if (!value) return "";
-
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(value);
-}
-
 function formatMoney(value: { toString(): string } | null | undefined) {
   if (!value) return "";
 
@@ -95,6 +73,70 @@ function formatMoney(value: { toString(): string } | null | undefined) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(amount);
+}
+
+function extractLocationCode(value: string | null | undefined) {
+  const text = String(value ?? "").trim().toUpperCase();
+  return text.match(/\(([A-Z]{3})\)/)?.[1] ?? text.match(/\b([A-Z]{3})\b/)?.[1] ?? "";
+}
+
+function parseFlightOptions(value: string | null): FlightOption[] {
+  try {
+    const parsed: unknown = value ? JSON.parse(value) : [];
+    return Array.isArray(parsed) ? (parsed as FlightOption[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function getTicketRoute(ticket: TicketWithRelations) {
+  const options = parseFlightOptions(ticket.flightOptionsJson);
+  const firstOption = options[0];
+  const lastOption = options.at(-1);
+  const departure = extractLocationCode(
+    firstOption?.departureCity ?? firstOption?.departureAirport ??
+      ticket.departureCity ?? ticket.departureAirport
+  );
+  const arrival = extractLocationCode(
+    lastOption?.arrivalCity ?? lastOption?.arrivalAirport ??
+      ticket.arrivalCity ?? ticket.arrivalAirport
+  );
+
+  return {
+    departure,
+    arrival,
+    serviceDetail: departure || arrival ? `${departure}-${arrival}` : "",
+    serviceDate: firstOption?.departureDate ?? ticket.departureDate,
+    serviceProvider: firstOption?.airline ?? ticket.airline ?? "",
+  };
+}
+
+function inferServiceArea(ticket: TicketWithRelations) {
+  const options = parseFlightOptions(ticket.flightOptionsJson);
+  const text = [
+    ...options.flatMap((option) => [
+      option.departureCity,
+      option.arrivalCity,
+      option.departureAirport,
+      option.arrivalAirport,
+    ]),
+    ticket.departureCity,
+    ticket.arrivalCity,
+    ticket.departureAirport,
+    ticket.arrivalAirport,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  const internationalHints = [
+    "singapore", "kuala lumpur", "malaysia", "bangkok", "thailand",
+    "jeddah", "dubai", "abu dhabi", "doha", "riyadh", "tokyo",
+    "narita", "haneda", "incheon", "seoul", "hong kong",
+  ];
+
+  return internationalHints.some((hint) => text.includes(hint))
+    ? "International"
+    : "Domestic";
 }
 
 function getSelectedColumns(columns?: string[]) {
@@ -108,7 +150,7 @@ function getSelectedColumns(columns?: string[]) {
 
   return selected.length
     ? selected
-    : (DOWNLOAD_DATA_COLUMNS.slice(0, 8).map((column) => column.key) as DownloadDataColumnKey[]);
+    : (DOWNLOAD_DATA_COLUMNS.map((column) => column.key) as DownloadDataColumnKey[]);
 }
 
 async function fetchMatchingTickets(filters: DownloadDataFilters) {
@@ -172,33 +214,22 @@ function buildRows(tickets: TicketWithRelations[]) {
         ];
 
     passengers.forEach((passenger) => {
+      const route = getTicketRoute(ticket);
+
       rows.push({
-        no: rows.length + 1,
-        vesselName: ticket.vessel?.name ?? "",
-        passengerName: passenger.name ?? "",
-        assign: ticket.assign ?? "",
-        serviceMode: ticket.serviceMode ?? "",
-        pnr: ticket.pnr ?? "",
-        provider: ticket.provider ?? "",
-        airline: ticket.airline ?? "",
-        ticketNumber: passenger.ticketNumber ?? ticket.ticketNumber ?? "",
-        rank: passenger.rank?.name ?? "",
-        title: passenger.title ?? "",
         bookingReference: ticket.bookingReference ?? "",
-        departureDate: formatDateTime(ticket.departureDate),
-        arrivalDate: formatDateTime(ticket.arrivalDate),
-        departureCity: ticket.departureCity ?? "",
-        arrivalCity: ticket.arrivalCity ?? "",
-        departureAirport: ticket.departureAirport ?? "",
-        arrivalAirport: ticket.arrivalAirport ?? "",
-        flightNumber: ticket.flightNumber ?? "",
-        cabinClass: ticket.cabinClass ?? "",
-        farePerPax: formatMoney(ticket.farePerPax),
-        grandTotal: formatMoney(ticket.grandTotal),
-        status: ticket.status,
-        functionCategory: ticket.functionCategory
-          ? ticket.functionCategory.replaceAll("_", " ")
-          : "",
+        docDate: formatDisplayDate(ticket.createdAt),
+        passengerName: passenger.name ?? "",
+        rank: passenger.rank?.name ?? "",
+        vesselName: ticket.vessel?.name ?? "",
+        status: ticket.assign ?? "",
+        serviceArea: inferServiceArea(ticket),
+        serviceMode: ticket.serviceMode ?? "",
+        serviceDetail: route.serviceDetail,
+        serviceDate: formatDisplayDate(route.serviceDate),
+        serviceProvider: route.serviceProvider,
+        fare: formatMoney(ticket.farePerPax),
+        ntaFare: formatMoney(ticket.ntaFare),
       });
     });
   });

@@ -56,6 +56,16 @@ function escapeHtml(value: string | null | undefined) {
     .replace(/'/g, "&#039;");
 }
 
+function sanitizeFileNamePart(value: string | null | undefined, fallback: string) {
+  const normalized = value
+    ?.trim()
+    .replace(/\s+/g, " ")
+    .replace(/[\\/:*?"<>|]/g, "-")
+    .toUpperCase();
+
+  return normalized || fallback;
+}
+
 function extractTime(value: string | null | undefined) {
   const text = sanitize(value);
   const match = text.match(/(\d{2}:\d{2})/);
@@ -302,6 +312,10 @@ export function renderFlightTicketHtml(ticket: FlightTicketLike) {
   const arrivalTime = extractTime(ticket.arrivalTime);
   const providerLogoSrc = PROVIDER_LOGO_SRC;
   const referenceNumber = ticket.bookingReference;
+  const ticketFileName = `${sanitizeFileNamePart(
+    referenceNumber?.replace(/\s+/g, ""),
+    "TICKET"
+  )}-${sanitizeFileNamePart(passengers[0]?.name, "CREW")}`;
   const infoIcon = renderHugeIconMarkup(InformationCircleIcon);
   const transportIcon = renderServiceModeIcon(ticket.serviceMode);
   const airlineBrandMarkup = renderAirlineBrandMarkup(ticket.airline);
@@ -313,7 +327,7 @@ export function renderFlightTicketHtml(ticket: FlightTicketLike) {
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>${escapeHtml(provider.templateName)}</title>
+    <title>${escapeHtml(ticketFileName)}</title>
     <link rel="preload" as="image" href="${providerLogoSrc}" fetchpriority="high" />
     ${airlineLogoSrc ? `<link rel="preload" as="image" href="${airlineLogoSrc}" fetchpriority="high" />` : ""}
     <style>

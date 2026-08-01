@@ -35,7 +35,7 @@ function getNextBookingReference(
     return Math.max(maxValue, numericPart);
   }, 0);
 
-  return `${prefix} ${String(maxSequence + 1).padStart(4, "0")}`;
+  return `${prefix}${String(maxSequence + 1).padStart(4, "0")}`;
 }
 
 export async function POST(request: Request) {

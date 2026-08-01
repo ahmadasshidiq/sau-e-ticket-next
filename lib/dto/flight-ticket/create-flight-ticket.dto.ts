@@ -2,6 +2,8 @@ import type { PassengerDto } from "./passenger.dto";
 import type { FlightOption } from "@/lib/flight-ticket/flight-options";
 
 export interface CreateFlightTicketDto {
+  bookingReference?: string | null;
+  docDate?: Date | string | null;
   provider?: string | null;
   status?: "DRAFT" | "GENERATED";
   templateId?: string | null;
@@ -24,6 +26,7 @@ export interface CreateFlightTicketDto {
   duration?: string | null;
   currency?: string | null;
   farePerPax?: string | number | null;
+  ntaFare?: string | number | null;
   tax?: string | number | null;
   grandTotal?: string | number | null;
   selectedFlightOptionKey?: string | null;

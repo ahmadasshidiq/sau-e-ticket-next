@@ -34,16 +34,16 @@ enum VesselType {
 }
 
 model User {
-  id            String     @id @default(cuid())
-  name          String
-  email         String     @unique
-  password      String
-  currentToken  String?    @map("current_token")
-  salt          String
-  status        UserStatus @default(ACTIVE)
-  role          UserRole   @default(USER)
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  id           String     @id @default(cuid())
+  name         String
+  email        String     @unique
+  password     String
+  currentToken String?    @map("current_token")
+  salt         String
+  status       UserStatus @default(ACTIVE)
+  role         UserRole   @default(USER)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
 }
 
 model Setting {
@@ -58,35 +58,35 @@ model Setting {
 }
 
 model Template {
-  id          String       @id @default(cuid())
-  name        String
-  type        TemplateType
-  preview     String?
-  html        String       @db.Text
-  description String?
-  isDefault   Boolean      @default(false)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  id            String         @id @default(cuid())
+  name          String
+  type          TemplateType
+  preview       String?
+  html          String         @db.Text
+  description   String?
+  isDefault     Boolean        @default(false)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
   flightTickets FlightTicket[]
 }
 
 model Vessel {
-  id          String @id @default(cuid())
-  name        String @unique
-  type        VesselType
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  invoiceItems InvoiceItem[]
+  id            String         @id @default(cuid())
+  name          String         @unique
+  type          VesselType
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  invoiceItems  InvoiceItem[]
   flightTickets FlightTicket[]
 }
 
 model Rank {
-  id          String @id @default(cuid())
-  name        String @unique
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String        @id @default(cuid())
+  name         String        @unique
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
   invoiceItems InvoiceItem[]
-  passengers  Passenger[]
+  passengers   Passenger[]
 }
 
 model Invoice {
@@ -96,82 +96,86 @@ model Invoice {
   customer         String?
   invoiceDate      DateTime?
   dueDate          DateTime?
-  subtotal         Decimal? @db.Decimal(18,2)
-  tax              Decimal? @db.Decimal(18,2)
-  total            Decimal? @db.Decimal(18,2)
-  notes            String? @db.Text
+  subtotal         Decimal?      @db.Decimal(18, 2)
+  tax              Decimal?      @db.Decimal(18, 2)
+  total            Decimal?      @db.Decimal(18, 2)
+  notes            String?       @db.Text
   originalFileName String
   objectKey        String
-  currency         String? @default("IDR")
+  currency         String?       @default("IDR")
   rawText          String?       @db.Text
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
   items            InvoiceItem[]
+
   @@index([invoiceDate])
   @@index([customer])
   @@index([vendor])
 }
 
 model InvoiceItem {
-  id               String @id @default(cuid())
-  invoiceId        String
-  invoice          Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  vesselId         String?
-  vessel           Vessel? @relation(fields: [vesselId], references: [id])
-  passenger        String
-  rankId           String?
-  rank             Rank? @relation(fields: [rankId], references: [id])
-  status           String?
-  serviceArea      String?
-  serviceMode      String?
-  serviceProvider  String?
-  serviceDetail    String?
-  lineNumber       Int?
-  fare             Decimal? @db.Decimal(18,2)
+  id              String   @id @default(cuid())
+  invoiceId       String
+  invoice         Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  vesselId        String?
+  vessel          Vessel?  @relation(fields: [vesselId], references: [id])
+  passenger       String
+  rankId          String?
+  rank            Rank?    @relation(fields: [rankId], references: [id])
+  status          String?
+  serviceArea     String?
+  serviceMode     String?
+  serviceProvider String?
+  serviceDetail   String?
+  lineNumber      Int?
+  fare            Decimal? @db.Decimal(18, 2)
 }
 
 model FlightTicket {
-  id                String      @id @default(cuid())
-  functionCategory  VesselType?
-  vesselId          String?
-  vessel            Vessel?     @relation(fields: [vesselId], references: [id])
-  assign            String?
-  serviceMode       String?
-  bookingReference  String?     @unique
-  provider          String?
-  status            DocumentStatus @default(DRAFT)
-  templateId        String?
-  template          Template?   @relation(fields: [templateId], references: [id], onDelete: SetNull)
-  pnr               String?
-  ticketNumber      String?
-  airline           String?
-  flightNumber      String?
-  cabinClass        String?
-  departureCity     String?
-  arrivalCity       String?
-  departureAirport  String?
-  arrivalAirport    String?
-  departureTerminal String?
-  departureGate     String?
-  departureDate     DateTime?
-  arrivalDate       DateTime?
-  departureTime     String?
-  arrivalTerminal   String?
-  arrivalTime       String?
-  duration          String?
-  currency          String? @default("IDR")
-  farePerPax        Decimal?     @db.Decimal(18, 2)
-  quantity          Int?         @default(1)
-  tax               Decimal?     @db.Decimal(18, 2)
-  grandTotal        Decimal?     @db.Decimal(18, 2)
+  id                      String         @id @default(cuid())
+  functionCategory        VesselType?
+  vesselId                String?
+  vessel                  Vessel?        @relation(fields: [vesselId], references: [id])
+  assign                  String?
+  serviceMode             String?
+  bookingReference        String?        @unique
+  docDate                 DateTime?
+  provider                String?
+  status                  DocumentStatus @default(DRAFT)
+  templateId              String?
+  template                Template?      @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  pnr                     String?
+  ticketNumber            String?
+  airline                 String?
+  flightNumber            String?
+  cabinClass              String?
+  departureCity           String?
+  arrivalCity             String?
+  departureAirport        String?
+  arrivalAirport          String?
+  departureTerminal       String?
+  departureGate           String?
+  departureDate           DateTime?
+  arrivalDate             DateTime?
+  departureTime           String?
+  arrivalTerminal         String?
+  arrivalTime             String?
+  duration                String?
+  currency                String?        @default("IDR")
+  farePerPax              Decimal?       @db.Decimal(18, 2)
+  ntaFare                 Decimal?       @db.Decimal(18, 2)
+  quantity                Int?           @default(1)
+  tax                     Decimal?       @db.Decimal(18, 2)
+  grandTotal              Decimal?       @db.Decimal(18, 2)
   selectedFlightOptionKey String?
-  flightOptionsJson String?      @db.Text
-  originalFileName  String
-  objectKey         String
-  rawText           String?      @db.Text
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
-  passengers        Passenger[]
+  flightOptionsJson       String?        @db.Text
+  originalFileName        String
+  objectKey               String
+  rawText                 String?        @db.Text
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime       @updatedAt
+  passengers              Passenger[]
+
   @@index([pnr])
   @@index([departureDate])
   @@index([provider])
@@ -190,6 +194,7 @@ model Passenger {
   passengerType  String?
   baggage        String?
   ticketNumber   String?
-  createdAt      DateTime @default(now())
+  createdAt      DateTime     @default(now())
+
   @@index([rankId])
 }

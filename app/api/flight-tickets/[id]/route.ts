@@ -82,7 +82,10 @@ export async function PATCH(
       vesselId: body.vesselId ?? null,
       assign: body.assign ?? null,
       serviceMode: body.serviceMode ?? null,
-      bookingReference: body.bookingReference ?? null,
+      bookingReference: body.bookingReference
+        ? String(body.bookingReference).replace(/\s+/g, "")
+        : null,
+      docDate: body.docDate ? new Date(body.docDate) : null,
       provider: body.provider ?? null,
       status: body.status ?? "DRAFT",
       pnr: body.pnr ?? null,
@@ -104,6 +107,7 @@ export async function PATCH(
       duration: body.duration ?? null,
       currency: body.currency ?? "IDR",
       farePerPax: parseDecimal(body.farePerPax),
+      ntaFare: parseDecimal(body.ntaFare),
       quantity: body.quantity ? Number(body.quantity) : 1,
       tax: parseDecimal(body.tax),
       grandTotal: parseDecimal(body.grandTotal),
