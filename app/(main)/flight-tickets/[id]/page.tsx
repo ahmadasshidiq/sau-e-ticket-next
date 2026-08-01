@@ -17,7 +17,10 @@ import { SearchableSelect, type SearchableSelectOption } from "@/components/sear
 import { useDebouncedRemoteSearch } from "@/hooks/use-debounced-remote-search";
 import { toast } from "@/lib/toast";
 import { SelectField } from "@/components/select-field";
-import type { FlightOption } from "@/lib/flight-ticket/flight-options";
+import {
+  sumFlightOptionDurations,
+  type FlightOption,
+} from "@/lib/flight-ticket/flight-options";
 
 type Passenger = {
   id?: string;
@@ -152,27 +155,31 @@ function reindexPassengerMap<T>(source: Record<number, T>, removedIndex: number)
   }, {});
 }
 
-function applyFlightOption(
-  ticket: FlightTicketDetail,
-  option: FlightOption
-): FlightTicketDetail {
+function summarizeFlightItinerary(ticket: FlightTicketDetail): FlightTicketDetail {
+  if (ticket.flightOptions.length < 2) {
+    return ticket;
+  }
+
+  const firstOption = ticket.flightOptions[0];
+  const lastOption = ticket.flightOptions[ticket.flightOptions.length - 1];
+
   return {
     ...ticket,
-    selectedFlightOptionKey: option.key,
-    airline: option.airline ?? null,
-    flightNumber: option.flightNumber ?? null,
-    cabinClass: option.cabinClass ?? null,
-    departureCity: option.departureCity ?? null,
-    arrivalCity: option.arrivalCity ?? null,
-    departureAirport: option.departureAirport ?? null,
-    arrivalAirport: option.arrivalAirport ?? null,
-    departureTerminal: option.departureTerminal ?? null,
-    arrivalTerminal: option.arrivalTerminal ?? null,
-    departureDate: option.departureDate ?? null,
-    arrivalDate: option.arrivalDate ?? null,
-    departureTime: option.departureTime ?? null,
-    arrivalTime: option.arrivalTime ?? null,
-    duration: option.duration ?? null,
+    selectedFlightOptionKey: null,
+    airline: firstOption.airline ?? null,
+    flightNumber: firstOption.flightNumber ?? null,
+    cabinClass: firstOption.cabinClass ?? null,
+    departureCity: firstOption.departureCity ?? null,
+    arrivalCity: lastOption.arrivalCity ?? null,
+    departureAirport: firstOption.departureAirport ?? null,
+    arrivalAirport: lastOption.arrivalAirport ?? null,
+    departureTerminal: firstOption.departureTerminal ?? null,
+    arrivalTerminal: lastOption.arrivalTerminal ?? null,
+    departureDate: firstOption.departureDate ?? null,
+    arrivalDate: lastOption.arrivalDate ?? null,
+    departureTime: firstOption.departureTime ?? null,
+    arrivalTime: lastOption.arrivalTime ?? null,
+    duration: sumFlightOptionDurations(ticket.flightOptions),
   };
 }
 
@@ -204,7 +211,11 @@ export default function ValidateFlightTicketPage() {
         return response.json();
       })
       .then((result) => {
-        setTicket(syncTicketPassengerQuantity(result as FlightTicketDetail));
+        setTicket(
+          syncTicketPassengerQuantity(
+            summarizeFlightItinerary(result as FlightTicketDetail)
+          )
+        );
         setVesselSearch(result.vesselName ?? "");
         setRankSearches(
           Array.isArray(result.passengers)
@@ -681,34 +692,6 @@ export default function ValidateFlightTicketPage() {
                 <Field label="Provider" value={ticket.provider} onChange={(value) => updateField("provider", value)} />
                 <Field label="Ticket ID" value={ticket.id} onChange={() => undefined} readOnly />
                 <Field label="Ticket Number" value={ticket.ticketNumber} onChange={(value) => updateField("ticketNumber", value)} />
-                {ticket.provider === "CUE_TRAVEL" && ticket.flightOptions.length > 1 ? (
-                  <SelectField
-                    label="Selected Flight"
-                    value={ticket.selectedFlightOptionKey ?? ticket.flightOptions[0]?.key ?? ""}
-                    onChange={(value) =>
-                      setTicket((current) => {
-                        if (!current) {
-                          return current;
-                        }
-
-                        const selectedOption = current.flightOptions.find(
-                          (option) => option.key === value
-                        );
-
-                        return selectedOption
-                          ? applyFlightOption(current, selectedOption)
-                          : {
-                              ...current,
-                              selectedFlightOptionKey: value || null,
-                            };
-                      })
-                    }
-                    options={ticket.flightOptions.map((option) => ({
-                      label: option.label,
-                      value: option.key,
-                    }))}
-                  />
-                ) : null}
                 <Field label="Airline" value={ticket.airline} onChange={(value) => updateField("airline", value)} />
                 <Field label="Flight Number" value={ticket.flightNumber} onChange={(value) => updateField("flightNumber", value)} />
                 <Field label="Cabin Class" value={ticket.cabinClass} onChange={(value) => updateField("cabinClass", value)} />

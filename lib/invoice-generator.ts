@@ -371,33 +371,11 @@ export async function buildInvoiceCsv(filters: InvoiceGeneratorFilters) {
 
 export async function buildInvoicePdfHtml(filters: InvoiceGeneratorFilters) {
   const preview = await buildInvoicePreview(filters);
-  const groupedRows = preview.rows.reduce<InvoiceGroupedRows[]>((groups, row) => {
-    const currentGroup = groups[groups.length - 1];
-
-    if (!currentGroup || currentGroup.vesselName !== row.vesselName) {
-      groups.push({
-        vesselName: row.vesselName,
-        rows: [row],
-        totalFare: row.fare,
-      });
-      return groups;
-    }
-
-    currentGroup.rows.push(row);
-    return groups;
-  }, []);
-
   const rowsMarkup =
-    groupedRows.length > 0
-      ? groupedRows
+    preview.rows.length > 0
+      ? preview.rows
           .map(
-            (group) => `
-              <tr class="group-row">
-                <td colspan="9">Vessel: ${escapeHtml(group.vesselName)}</td>
-              </tr>
-              ${group.rows
-                .map(
-                  (row) => `
+            (row) => `
               <tr>
                 <td>${escapeHtml(row.title ? `${row.title}. ${row.passenger}` : row.passenger)}</td>
                 <td>${escapeHtml(row.rank || "-")}</td>
@@ -409,9 +387,6 @@ export async function buildInvoicePdfHtml(filters: InvoiceGeneratorFilters) {
                 <td>${escapeHtml(row.serviceDetail || "-")}</td>
                 <td class="right">${escapeHtml(row.fare)}</td>
               </tr>
-            `
-                )
-                .join("")}
             `
           )
           .join("")
@@ -444,7 +419,6 @@ export async function buildInvoicePdfHtml(filters: InvoiceGeneratorFilters) {
     th, td { border: 1px solid #2d3748; padding: 7px 10px; font-size: 11px; }
     th { background: #c7d7f2; text-align: center; font-size: 11px; }
     td { vertical-align: top; }
-    .group-row td { background: #eef2ff; font-weight: 700; color: #1e3a8a; }
     td.right { text-align: right; white-space: nowrap; }
     td.center { text-align: center; }
     .total-row td { background: #c7d7f2; font-weight: 700; }

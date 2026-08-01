@@ -1,5 +1,8 @@
 import type { PassengerDto } from "@/lib/dto/flight-ticket/passenger.dto";
-import type { FlightOption } from "@/lib/flight-ticket/flight-options";
+import {
+  sumFlightOptionDurations,
+  type FlightOption,
+} from "@/lib/flight-ticket/flight-options";
 import {
   flattenItems,
   normalizeWhitespace,
@@ -486,7 +489,8 @@ export function mapCueTravelMulti(lines: PdfLine[]): PartialFlightTicketDraft | 
     return null;
   }
 
-  const selectedFlightOption = flightOptions[0];
+  const firstFlightOption = flightOptions[0];
+  const lastFlightOption = flightOptions[flightOptions.length - 1];
   const passengers = parseCuePassenger(items);
   const checkedBaggageItem = findCueItem(items, {
     minX: 435,
@@ -512,21 +516,21 @@ export function mapCueTravelMulti(lines: PdfLine[]): PartialFlightTicketDraft | 
     provider: "CUE_TRAVEL",
     pnr: pnrItem?.text.match(/[A-Z0-9]{6}$/i)?.[0] ?? null,
     ticketNumber,
-    airline: selectedFlightOption.airline ?? null,
-    flightNumber: selectedFlightOption.flightNumber ?? null,
-    cabinClass: selectedFlightOption.cabinClass ?? null,
-    departureCity: selectedFlightOption.departureCity ?? null,
-    arrivalCity: selectedFlightOption.arrivalCity ?? null,
-    departureAirport: selectedFlightOption.departureAirport ?? null,
-    arrivalAirport: selectedFlightOption.arrivalAirport ?? null,
-    departureTerminal: selectedFlightOption.departureTerminal ?? null,
-    arrivalTerminal: selectedFlightOption.arrivalTerminal ?? null,
-    departureDate: selectedFlightOption.departureDate ?? null,
-    arrivalDate: selectedFlightOption.arrivalDate ?? null,
-    departureTime: selectedFlightOption.departureTime ?? null,
-    arrivalTime: selectedFlightOption.arrivalTime ?? null,
-    duration: selectedFlightOption.duration ?? null,
-    selectedFlightOptionKey: selectedFlightOption.key,
+    airline: firstFlightOption.airline ?? null,
+    flightNumber: firstFlightOption.flightNumber ?? null,
+    cabinClass: firstFlightOption.cabinClass ?? null,
+    departureCity: firstFlightOption.departureCity ?? null,
+    arrivalCity: lastFlightOption.arrivalCity ?? null,
+    departureAirport: firstFlightOption.departureAirport ?? null,
+    arrivalAirport: lastFlightOption.arrivalAirport ?? null,
+    departureTerminal: firstFlightOption.departureTerminal ?? null,
+    arrivalTerminal: lastFlightOption.arrivalTerminal ?? null,
+    departureDate: firstFlightOption.departureDate ?? null,
+    arrivalDate: lastFlightOption.arrivalDate ?? null,
+    departureTime: firstFlightOption.departureTime ?? null,
+    arrivalTime: lastFlightOption.arrivalTime ?? null,
+    duration: sumFlightOptionDurations(flightOptions),
+    selectedFlightOptionKey: null,
     flightOptions,
     rawText,
     passengers,
