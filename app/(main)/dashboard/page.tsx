@@ -58,7 +58,7 @@ type TicketRecord = {
   farePerPax: { toString(): string } | null;
   grandTotal: { toString(): string } | null;
   quantity: number | null;
-  departureDate: Date | null;
+  createdAt: Date;
   passengers: Array<{ id: string }>;
 };
 
@@ -154,6 +154,17 @@ function getJakartaYear(date: Date) {
   );
 }
 
+function getJakartaMonthIndex(date: Date) {
+  return (
+    Number(
+      new Intl.DateTimeFormat("en", {
+        month: "numeric",
+        timeZone: "Asia/Jakarta",
+      }).format(date)
+    ) - 1
+  );
+}
+
 async function getDashboardSummary(
   selectedYear: number,
   reportDate: Date
@@ -172,7 +183,7 @@ async function getDashboardSummary(
         functionCategory: {
           in: ["CREWING_TANKER", "CMOS"],
         },
-        departureDate: {
+        createdAt: {
           gte: yearStart,
           lte: yearEnd,
         },
@@ -183,7 +194,7 @@ async function getDashboardSummary(
         farePerPax: true,
         grandTotal: true,
         quantity: true,
-        departureDate: true,
+        createdAt: true,
         passengers: {
           select: {
             id: true,
@@ -191,7 +202,7 @@ async function getDashboardSummary(
         },
       },
       orderBy: {
-        departureDate: "asc",
+        createdAt: "asc",
       },
     }) as Promise<TicketRecord[]>,
     prisma.flightTicket.findFirst({
@@ -200,21 +211,18 @@ async function getDashboardSummary(
         functionCategory: {
           in: ["CREWING_TANKER", "CMOS"],
         },
-        departureDate: {
-          not: null,
-        },
       },
       orderBy: {
-        departureDate: "asc",
+        createdAt: "asc",
       },
       select: {
-        departureDate: true,
+        createdAt: true,
       },
     }),
   ]);
 
   const earliestYear =
-    earliestTicket?.departureDate?.getUTCFullYear() ?? currentYear;
+    earliestTicket ? getJakartaYear(earliestTicket.createdAt) : currentYear;
   const availableYears: number[] = [];
 
   for (let year = currentYear; year >= earliestYear; year -= 1) {
@@ -227,9 +235,7 @@ async function getDashboardSummary(
   };
 
   for (const ticket of tickets) {
-    if (!ticket.departureDate) continue;
-
-    const monthIndex = ticket.departureDate.getUTCMonth();
+    const monthIndex = getJakartaMonthIndex(ticket.createdAt);
     if (monthIndex < 0 || monthIndex >= ALL_MONTH_LABELS.length) continue;
 
     const clientKey =
