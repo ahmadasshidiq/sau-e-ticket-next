@@ -53,7 +53,6 @@ type InvoiceForm = {
   vesselId: string;
   dateFrom: string;
   dateTo: string;
-  invoiceNumber: string;
   consolidatedInvoiceNumber: string;
   invoiceDate: string;
   dueDate: string;
@@ -69,7 +68,6 @@ const defaultForm: InvoiceForm = {
   vesselId: "",
   dateFrom: "",
   dateTo: "",
-  invoiceNumber: "",
   consolidatedInvoiceNumber: "",
   invoiceDate: "",
   dueDate: "",
@@ -186,7 +184,7 @@ export default function InvoicesPage() {
       const url = window.URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = `${form.invoiceNumber || form.consolidatedInvoiceNumber || "invoice-export"}.csv`;
+      anchor.download = `${form.consolidatedInvoiceNumber || "invoice-export"}.csv`;
       anchor.click();
       window.URL.revokeObjectURL(url);
     } catch (error) {
@@ -264,11 +262,6 @@ export default function InvoicesPage() {
               type="date"
               value={form.dateTo}
               onChange={(value) => setForm((current) => ({ ...current, dateTo: value }))}
-            />
-            <Field
-              label="Invoice Number"
-              value={form.invoiceNumber}
-              onChange={(value) => setForm((current) => ({ ...current, invoiceNumber: value }))}
             />
             <Field
               label="Consolidated Invoice"

@@ -2,7 +2,6 @@ import { DashboardShell } from "@/components/dashboard-shell";
 import { DashboardTicketChart } from "@/components/dashboard-ticket-chart";
 import { prisma } from "@/lib/prisma";
 
-const TODAY = new Date("2026-07-25T23:59:59+07:00");
 const ALL_MONTH_LABELS = [
   "Jan",
   "Feb",
@@ -18,8 +17,10 @@ const ALL_MONTH_LABELS = [
   "Dec",
 ] as const;
 const CLIENT_ORDER = ["CT", "CM"] as const;
+const VENDOR_ORDER = ["VIA", "CUE_TRAVEL", "MASKAPAI"] as const;
 
 type ClientKey = (typeof CLIENT_ORDER)[number];
+type VendorKey = (typeof VENDOR_ORDER)[number];
 type MonthlySeries = number[];
 
 type VendorSummary = {
@@ -88,7 +89,9 @@ function createClientSummary(
     monthlyAmounts: createMonthlySeries(),
     totalTickets: 0,
     totalAmount: 0,
-    vendors: {},
+    vendors: Object.fromEntries(
+      VENDOR_ORDER.map((vendor) => [vendor, createVendorSummary(vendor)])
+    ),
   };
 }
 
@@ -106,14 +109,12 @@ function toNumber(
   return Number.isFinite(normalized) ? normalized : 0;
 }
 
-function resolveVendor(provider: string | null | undefined) {
-  const normalized = provider?.trim();
+function resolveVendor(provider: string | null | undefined): VendorKey {
+  const normalized = provider?.trim().toUpperCase();
 
-  if (!normalized) {
-    return "-";
-  }
-
-  return normalized;
+  return normalized === "VIA" || normalized === "CUE_TRAVEL"
+    ? normalized
+    : "MASKAPAI";
 }
 
 function resolveTicketCount(ticket: TicketRecord) {
@@ -144,11 +145,24 @@ function formatDateLabel(date: Date) {
   }).format(date);
 }
 
-async function getDashboardSummary(selectedYear: number): Promise<DashboardSummary> {
+function getJakartaYear(date: Date) {
+  return Number(
+    new Intl.DateTimeFormat("en", {
+      year: "numeric",
+      timeZone: "Asia/Jakarta",
+    }).format(date)
+  );
+}
+
+async function getDashboardSummary(
+  selectedYear: number,
+  reportDate: Date
+): Promise<DashboardSummary> {
+  const currentYear = getJakartaYear(reportDate);
   const yearStart = new Date(`${selectedYear}-01-01T00:00:00+07:00`);
   const yearEnd =
-    selectedYear === TODAY.getUTCFullYear()
-      ? TODAY
+    selectedYear === currentYear
+      ? reportDate
       : new Date(`${selectedYear}-12-31T23:59:59+07:00`);
 
   const [tickets, earliestTicket] = await Promise.all([
@@ -200,10 +214,10 @@ async function getDashboardSummary(selectedYear: number): Promise<DashboardSumma
   ]);
 
   const earliestYear =
-    earliestTicket?.departureDate?.getUTCFullYear() ?? TODAY.getUTCFullYear();
+    earliestTicket?.departureDate?.getUTCFullYear() ?? currentYear;
   const availableYears: number[] = [];
 
-  for (let year = TODAY.getUTCFullYear(); year >= earliestYear; year -= 1) {
+  for (let year = currentYear; year >= earliestYear; year -= 1) {
     availableYears.push(year);
   }
 
@@ -254,7 +268,7 @@ async function getDashboardSummary(selectedYear: number): Promise<DashboardSumma
   return {
     selectedYear,
     monthLabels,
-    generatedAtLabel: formatDateLabel(TODAY),
+    generatedAtLabel: formatDateLabel(reportDate),
     availableYears,
     totalTicketsYtd: CLIENT_ORDER.reduce(
       (sum, key) => sum + clients[key].totalTickets,
@@ -273,10 +287,12 @@ export default async function DashboardPage({
 }: {
   searchParams?: Promise<{ year?: string }>;
 }) {
+  const reportDate = new Date();
+  const currentYear = getJakartaYear(reportDate);
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
-  const rawYear = Number(resolvedSearchParams?.year ?? TODAY.getUTCFullYear());
-  const selectedYear = Number.isFinite(rawYear) ? rawYear : TODAY.getUTCFullYear();
-  const summary = await getDashboardSummary(selectedYear);
+  const rawYear = Number(resolvedSearchParams?.year ?? currentYear);
+  const selectedYear = Number.isFinite(rawYear) ? rawYear : currentYear;
+  const summary = await getDashboardSummary(selectedYear, reportDate);
 
   return (
     <DashboardShell
@@ -291,7 +307,7 @@ export default async function DashboardPage({
                 Year Filter
               </h2>
               <p className="mt-1 text-[13px] text-[#8d8d8d] dark:text-[#94a3b8]">
-                {summary.selectedYear === TODAY.getUTCFullYear()
+                {summary.selectedYear === currentYear
                   ? `Showing January through December ${summary.selectedYear}. Data is available through ${summary.generatedAtLabel}`
                   : `Showing January through December ${summary.selectedYear}.`}
               </p>
@@ -458,9 +474,7 @@ function ClientPanel({
           title="Tickets per Vendor"
           monthLabels={monthLabels}
           unit="ticket"
-          vendors={Object.values(client.vendors).sort((left, right) =>
-            left.name.localeCompare(right.name)
-          )}
+          vendors={VENDOR_ORDER.map((vendor) => client.vendors[vendor])}
           valueSelector={(vendor) => vendor.monthlyTickets}
           totalSelector={(vendor) => vendor.totalTickets}
         />
@@ -469,9 +483,7 @@ function ClientPanel({
           title="Ticket Purchases per Vendor"
           monthLabels={monthLabels}
           unit="currency"
-          vendors={Object.values(client.vendors).sort((left, right) =>
-            left.name.localeCompare(right.name)
-          )}
+          vendors={VENDOR_ORDER.map((vendor) => client.vendors[vendor])}
           valueSelector={(vendor) => vendor.monthlyAmounts}
           totalSelector={(vendor) => vendor.totalAmount}
         />
