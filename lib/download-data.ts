@@ -188,7 +188,7 @@ async function fetchMatchingTickets(filters: DownloadDataFilters) {
         },
       },
     },
-    orderBy: { createdAt: "asc" },
+    orderBy: { createdAt: "desc" },
   });
 }
 
