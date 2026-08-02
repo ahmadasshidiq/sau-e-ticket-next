@@ -117,7 +117,7 @@ function resolveVendor(provider: string | null | undefined): VendorKey {
     : "MASKAPAI";
 }
 
-function resolveTicketCount(ticket: TicketRecord) {
+function resolveBillablePassengerCount(ticket: TicketRecord) {
   if (ticket.passengers.length > 0) return ticket.passengers.length;
   if ((ticket.quantity ?? 0) > 0) return ticket.quantity ?? 0;
   return 1;
@@ -243,8 +243,9 @@ async function getDashboardSummary(
 
     const client = clients[clientKey];
     const vendorKey = resolveVendor(ticket.provider);
-    const ticketCount = resolveTicketCount(ticket);
-    const ticketAmount = resolveTicketAmount(ticket, ticketCount);
+    const ticketCount = 1;
+    const billablePassengerCount = resolveBillablePassengerCount(ticket);
+    const ticketAmount = resolveTicketAmount(ticket, billablePassengerCount);
 
     client.monthlyTickets[monthIndex] += ticketCount;
     client.monthlyAmounts[monthIndex] += ticketAmount;
