@@ -50,6 +50,9 @@ type FlightTicketDetail = {
   docDate: string | null;
   provider: string | null;
   status: "DRAFT" | "GENERATED";
+  refundStatus: "NONE" | "REQUESTED" | "APPROVED" | "REJECTED" | "PROCESSED";
+  refundAmount: string | null;
+  rescheduleFee: string | null;
   pnr: string | null;
   ticketNumber: string | null;
   airline: string | null;
@@ -911,6 +914,46 @@ export default function ValidateFlightTicketPage() {
                   value={ticket.grandTotal}
                   onChange={(value) => updateField("grandTotal", value)}
                   readOnly
+                />
+              </div>
+            </section>
+
+            <section className={sectionClassName}>
+              <div className="mb-5">
+                <h2 className="text-lg font-semibold text-[#111827] dark:text-white">Refund & Reschedule</h2>
+                <p className="mt-1 text-sm text-[#6b7280] dark:text-[#94a3b8]">
+                  Catat status pengajuan refund, nominal yang dikembalikan, dan biaya tambahan jika tiket di-reschedule.
+                </p>
+              </div>
+              <div className="grid gap-5 xl:grid-cols-3">
+                <SelectField
+                  label="Refund Status"
+                  value={ticket.refundStatus ?? "NONE"}
+                  onChange={(value) => {
+                    const nextStatus = value as FlightTicketDetail["refundStatus"];
+                    updateField("refundStatus", nextStatus);
+                    if (nextStatus === "NONE" || nextStatus === "REJECTED") {
+                      updateField("refundAmount", "");
+                    }
+                  }}
+                  options={[
+                    { label: "Tidak ada refund", value: "NONE" },
+                    { label: "Requested", value: "REQUESTED" },
+                    { label: "Approved", value: "APPROVED" },
+                    { label: "Rejected", value: "REJECTED" },
+                    { label: "Processed", value: "PROCESSED" },
+                  ]}
+                />
+                <CurrencyField
+                  label="Nominal Refund"
+                  value={ticket.refundAmount}
+                  onChange={(value) => updateField("refundAmount", value)}
+                  readOnly={ticket.refundStatus === "NONE" || ticket.refundStatus === "REJECTED"}
+                />
+                <CurrencyField
+                  label="Biaya Tambahan Reschedule"
+                  value={ticket.rescheduleFee}
+                  onChange={(value) => updateField("rescheduleFee", value)}
                 />
               </div>
             </section>

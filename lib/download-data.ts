@@ -17,6 +17,9 @@ export const DOWNLOAD_DATA_COLUMNS = [
   { key: "serviceProvider", label: "Service Provider" },
   { key: "fare", label: "Fare" },
   { key: "ntaFare", label: "NTA Fare" },
+  { key: "refundStatus", label: "Refund Status" },
+  { key: "refundAmount", label: "Refund Amount" },
+  { key: "rescheduleFee", label: "Reschedule Fee" },
 ] as const;
 
 export type DownloadDataColumnKey = (typeof DOWNLOAD_DATA_COLUMNS)[number]["key"];
@@ -61,6 +64,23 @@ function formatDisplayDate(value?: string | Date | null) {
     month: "short",
     year: "numeric",
   }).format(date);
+}
+
+function formatDateOnlyDisplay(value?: string | Date | null) {
+  if (!value) return "";
+
+  const isoDate = value instanceof Date
+    ? value.toISOString().slice(0, 10)
+    : String(value).slice(0, 10);
+  const [year, month, day] = isoDate.split("-").map(Number);
+  if (!year || !month || !day) return "";
+
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(year, month - 1, day)));
 }
 
 function formatMoney(value: { toString(): string } | null | undefined) {
@@ -156,6 +176,9 @@ function getSelectedColumns(columns?: string[]) {
 async function fetchMatchingTickets(filters: DownloadDataFilters) {
   const dateFrom = normalizeDateInput(filters.dateFrom);
   const dateTo = normalizeDateInput(filters.dateTo);
+  const dateToExclusive = dateTo
+    ? new Date(dateTo.getTime() + 24 * 60 * 60 * 1000)
+    : undefined;
 
   return prisma.flightTicket.findMany({
     where: {
@@ -164,11 +187,11 @@ async function fetchMatchingTickets(filters: DownloadDataFilters) {
             functionCategory: filters.functionCategory.trim() as VesselType,
           }
         : {}),
-      departureDate:
+      docDate:
         dateFrom || dateTo
           ? {
               ...(dateFrom ? { gte: dateFrom } : {}),
-              ...(dateTo ? { lte: dateTo } : {}),
+              ...(dateToExclusive ? { lt: dateToExclusive } : {}),
             }
           : undefined,
     },
@@ -218,7 +241,7 @@ function buildRows(tickets: TicketWithRelations[]) {
 
       rows.push({
         bookingReference: ticket.bookingReference ?? "",
-        docDate: formatDisplayDate(ticket.createdAt),
+        docDate: formatDateOnlyDisplay(ticket.docDate),
         passengerName: passenger.name ?? "",
         rank: passenger.rank?.name ?? "",
         vesselName: ticket.vessel?.name ?? "",
@@ -230,6 +253,9 @@ function buildRows(tickets: TicketWithRelations[]) {
         serviceProvider: route.serviceProvider,
         fare: formatMoney(ticket.farePerPax),
         ntaFare: formatMoney(ticket.ntaFare),
+        refundStatus: ticket.refundStatus ?? "NONE",
+        refundAmount: formatMoney(ticket.refundAmount),
+        rescheduleFee: formatMoney(ticket.rescheduleFee),
       });
     });
   });

@@ -6,6 +6,9 @@ export interface UpdateFlightTicketDto {
   docDate?: Date | string | null;
   provider?: string | null;
   status?: "DRAFT" | "GENERATED";
+  refundStatus?: "NONE" | "REQUESTED" | "APPROVED" | "REJECTED" | "PROCESSED";
+  refundAmount?: string | number | null;
+  rescheduleFee?: string | number | null;
   templateId?: string | null;
   pnr?: string | null;
   ticketNumber?: string | null;

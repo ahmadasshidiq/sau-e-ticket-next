@@ -27,6 +27,14 @@ enum DocumentStatus {
   GENERATED
 }
 
+enum RefundStatus {
+  NONE
+  REQUESTED
+  APPROVED
+  REJECTED
+  PROCESSED
+}
+
 enum VesselType {
   CREWING_TANKER
   CMOS
@@ -142,6 +150,9 @@ model FlightTicket {
   docDate                 DateTime?
   provider                String?
   status                  DocumentStatus @default(DRAFT)
+  refundStatus            RefundStatus   @default(NONE)
+  refundAmount            Decimal?       @db.Decimal(18, 2)
+  rescheduleFee           Decimal?       @db.Decimal(18, 2)
   templateId              String?
   template                Template?      @relation(fields: [templateId], references: [id], onDelete: SetNull)
   pnr                     String?

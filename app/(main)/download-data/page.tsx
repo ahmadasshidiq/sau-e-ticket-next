@@ -44,6 +44,9 @@ const availableColumns = [
   { key: "serviceProvider", label: "Service Provider" },
   { key: "fare", label: "Fare" },
   { key: "ntaFare", label: "NTA Fare" },
+  { key: "refundStatus", label: "Refund Status" },
+  { key: "refundAmount", label: "Refund Amount" },
+  { key: "rescheduleFee", label: "Reschedule Fee" },
 ] as const;
 
 type ColumnKey = (typeof availableColumns)[number]["key"];

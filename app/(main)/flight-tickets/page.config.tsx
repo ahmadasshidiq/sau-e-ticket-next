@@ -71,6 +71,11 @@ export const pageConfig: DataPageConfig<InvoiceRow> = {
       formatter: (value) => formatCell(value),
     },
     {
+      key: "docDate",
+      title: "Document Date",
+      formatter: (value) => formatCell(value),
+    },
+    {
       key: "createdAt",
       title: "Created At",
       formatter: (value) => formatCell(value),

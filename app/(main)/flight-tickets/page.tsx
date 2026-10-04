@@ -26,7 +26,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { SearchableSelect, type SearchableSelectOption } from "@/components/searchable-select";
+import {
+  SearchableSelect,
+  type SearchableSelectOption,
+} from "@/components/searchable-select";
 import { useDebouncedRemoteSearch } from "@/hooks/use-debounced-remote-search";
 import { toast } from "@/lib/toast";
 import {
@@ -48,8 +51,12 @@ type FlightTicketRecord = {
   airline: string | null;
   departureCity: string | null;
   arrivalCity: string | null;
+  docDate: string | null;
   departureDate: string | null;
   grandTotal: string | null;
+  refundStatus: "NONE" | "REQUESTED" | "APPROVED" | "REJECTED" | "PROCESSED";
+  refundAmount: string | null;
+  rescheduleFee: string | null;
   createdAt: string;
   passengers: Array<{
     id: string;
@@ -63,6 +70,7 @@ type FlightTicketRow = FlightTicketRecord & {
   functionCategoryDisplay: string;
   providerLabel: string;
   templateDisplay: string;
+  docDateDisplay: string;
   departureDateDisplay: string;
   createdAtDisplay: string;
 };
@@ -141,11 +149,13 @@ export default function FlightTicketsPage() {
   const [keyword, setKeyword] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<string>(
-    FLIGHT_TICKET_PROVIDERS[0].value
+    FLIGHT_TICKET_PROVIDERS[0].value,
   );
-  const [selectedFunctionCategory, setSelectedFunctionCategory] = useState<string>("CMOS");
+  const [selectedFunctionCategory, setSelectedFunctionCategory] =
+    useState<string>("CMOS");
   const [selectedAssign, setSelectedAssign] = useState<string>("Sign On");
-  const [selectedServiceMode, setSelectedServiceMode] = useState<string>("Flight");
+  const [selectedServiceMode, setSelectedServiceMode] =
+    useState<string>("Flight");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [draftFilters, setDraftFilters] = useState<Record<string, string>>({
     keyword: "",
@@ -165,48 +175,49 @@ export default function FlightTicketsPage() {
   });
   const [isVesselFilterOpen, setIsVesselFilterOpen] = useState(false);
 
-  const {
-    items: vesselFilterOptions,
-    loading: vesselFilterLoading,
-  } = useDebouncedRemoteSearch<VesselOption>({
-    query: draftFilters.vesselName ?? "",
-    enabled: isVesselFilterOpen,
-    delay: 400,
-    deps: [draftFilters.functionCategory ?? ""],
-    search: async (query, signal) => {
-      const searchParams = new URLSearchParams({
-        page: "1",
-        pageSize: "10",
-      });
+  const { items: vesselFilterOptions, loading: vesselFilterLoading } =
+    useDebouncedRemoteSearch<VesselOption>({
+      query: draftFilters.vesselName ?? "",
+      enabled: isVesselFilterOpen,
+      delay: 400,
+      deps: [draftFilters.functionCategory ?? ""],
+      search: async (query, signal) => {
+        const searchParams = new URLSearchParams({
+          page: "1",
+          pageSize: "10",
+        });
 
-      if (query.trim()) {
-        searchParams.set("name", query.trim());
-      }
+        if (query.trim()) {
+          searchParams.set("name", query.trim());
+        }
 
-      if ((draftFilters.functionCategory ?? "").trim()) {
-        searchParams.set("type", draftFilters.functionCategory.trim());
-      }
+        if ((draftFilters.functionCategory ?? "").trim()) {
+          searchParams.set("type", draftFilters.functionCategory.trim());
+        }
 
-      const response = await fetch(`/api/vessels?${searchParams.toString()}`, {
-        signal,
-      });
+        const response = await fetch(
+          `/api/vessels?${searchParams.toString()}`,
+          {
+            signal,
+          },
+        );
 
-      if (!response.ok) {
-        throw new Error("Failed to load vessels.");
-      }
+        if (!response.ok) {
+          throw new Error("Failed to load vessels.");
+        }
 
-      const result = await response.json();
-      return Array.isArray(result.data) ? result.data : [];
-    },
-    onError: (error) => {
-      toast({
-        title: "Failed to load vessels",
-        description:
-          error instanceof Error ? error.message : "Unknown error occurred.",
-        variant: "destructive",
-      });
-    },
-  });
+        const result = await response.json();
+        return Array.isArray(result.data) ? result.data : [];
+      },
+      onError: (error) => {
+        toast({
+          title: "Failed to load vessels",
+          description:
+            error instanceof Error ? error.message : "Unknown error occurred.",
+          variant: "destructive",
+        });
+      },
+    });
 
   useEffect(() => {
     void loadTickets();
@@ -215,7 +226,7 @@ export default function FlightTicketsPage() {
   async function loadTickets(
     nextPage = page,
     nextPageSize = pageSize,
-    filters = appliedFilters
+    filters = appliedFilters,
   ) {
     setLoading(true);
 
@@ -306,7 +317,7 @@ export default function FlightTicketsPage() {
 
   async function handleDelete(ticketId: string) {
     const confirmed = window.confirm(
-      "Delete this flight ticket draft? This action cannot be undone."
+      "Delete this flight ticket draft? This action cannot be undone.",
     );
 
     if (!confirmed) {
@@ -326,7 +337,9 @@ export default function FlightTicketsPage() {
         throw new Error(result.message ?? "Failed to delete flight ticket.");
       }
 
-      setTickets((current) => current.filter((ticket) => ticket.id !== ticketId));
+      setTickets((current) =>
+        current.filter((ticket) => ticket.id !== ticketId),
+      );
       await loadTickets(page, pageSize, appliedFilters);
       toast({
         title: "Flight ticket deleted",
@@ -361,15 +374,22 @@ export default function FlightTicketsPage() {
           functionCategoryDisplay:
             ticket.functionCategory === "CREWING_TANKER"
               ? "Crewing Tanker"
-              : ticket.functionCategory ?? "-",
+              : (ticket.functionCategory ?? "-"),
           providerLabel: providerMeta.label,
           templateDisplay: ticket.templateName || providerMeta.templateName,
+          docDateDisplay: ticket.docDate
+            ? new Intl.DateTimeFormat("en-GB", {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+              }).format(new Date(ticket.docDate))
+            : "-",
           departureDateDisplay: ticket.departureDate
             ? new Intl.DateTimeFormat("en-GB", {
-              day: "2-digit",
-              month: "2-digit",
-              year: "numeric",
-            }).format(new Date(ticket.departureDate))
+                day: "2-digit",
+                month: "2-digit",
+                year: "numeric",
+              }).format(new Date(ticket.departureDate))
             : "-",
           createdAtDisplay: new Intl.DateTimeFormat("en-GB", {
             day: "2-digit",
@@ -381,7 +401,7 @@ export default function FlightTicketsPage() {
           }).format(new Date(ticket.createdAt)),
         };
       }),
-    [tickets]
+    [tickets],
   );
 
   const columns = useMemo<DataColumn<FlightTicketRow>[]>(
@@ -461,6 +481,11 @@ export default function FlightTicketsPage() {
         formatter: (value: unknown) => renderTruncatedCell(value, 3),
       },
       {
+        key: "docDateDisplay",
+        title: "Doc Date",
+        widthClassName: "w-[130px]",
+      },
+      {
         key: "departureDateDisplay",
         title: "Departure Date",
         widthClassName: "w-[130px]",
@@ -472,15 +497,50 @@ export default function FlightTicketsPage() {
         formatter: (value: unknown) => String(value ?? "-"),
       },
       {
+        key: "refundStatus",
+        title: "Refund Status",
+        widthClassName: "w-[140px]",
+        formatter: (value: unknown) => {
+          const status = String(value ?? "NONE");
+          const badgeClassName = {
+            NONE: "bg-slate-100 text-slate-600 dark:bg-slate-700/40 dark:text-slate-300",
+            REQUESTED: "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300",
+            APPROVED: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
+            REJECTED: "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300",
+            PROCESSED: "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300",
+          }[status as "NONE" | "REQUESTED" | "APPROVED" | "REJECTED" | "PROCESSED"] ??
+            "bg-slate-100 text-slate-600 dark:bg-slate-700/40 dark:text-slate-300";
+
+          return (
+            <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${badgeClassName}`}>
+              {status}
+            </span>
+          );
+        },
+      },
+      {
+        key: "refundAmount",
+        title: "Refund Amount",
+        widthClassName: "w-[140px]",
+        formatter: (value: unknown) => String(value ?? "-"),
+      },
+      {
+        key: "rescheduleFee",
+        title: "Reschedule Fee",
+        widthClassName: "w-[140px]",
+        formatter: (value: unknown) => String(value ?? "-"),
+      },
+      {
         key: "status",
         title: "Status",
         widthClassName: "w-[130px]",
         formatter: (value: unknown) => (
           <span
-            className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${value === "DRAFT"
-              ? "bg-[#fff3e4] text-[#f58a07]"
-              : "bg-[#ebf8ef] text-[#17803d]"
-              }`}
+            className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+              value === "DRAFT"
+                ? "bg-[#fff3e4] text-[#f58a07]"
+                : "bg-[#ebf8ef] text-[#17803d]"
+            }`}
           >
             {String(value ?? "-")}
           </span>
@@ -512,7 +572,11 @@ export default function FlightTicketsPage() {
               title="Validate flight ticket"
               className="rounded-[10px] p-2 text-[#64748b] transition hover:bg-[#f8fafc] hover:text-[#334155] dark:text-[#94a3b8] dark:hover:bg-white/8 dark:hover:text-white"
             >
-              <HugeiconsIcon icon={PencilEdit02Icon} size={18} strokeWidth={1.8} />
+              <HugeiconsIcon
+                icon={PencilEdit02Icon}
+                size={18}
+                strokeWidth={1.8}
+              />
             </Link>
             <button
               type="button"
@@ -528,7 +592,7 @@ export default function FlightTicketsPage() {
         ),
       },
     ],
-    [deletingId]
+    [deletingId],
   );
 
   const filterContent = useMemo<ReactNode>(
@@ -572,7 +636,10 @@ export default function FlightTicketsPage() {
                 vesselName: "",
               }))
             }
-            items={[{ label: "All fungsi", value: ALL_FILTER_VALUE }, ...CATEGORY_OPTIONS]}
+            items={[
+              { label: "All fungsi", value: ALL_FILTER_VALUE },
+              ...CATEGORY_OPTIONS,
+            ]}
           >
             <SelectTrigger className="h-[48px] w-full rounded-[14px] border-[#d1d5db] bg-white px-4 text-[14px] text-[#111827] dark:border-white/10 dark:bg-[#151d2c] dark:text-white">
               <SelectValue placeholder="Select fungsi" />
@@ -582,7 +649,10 @@ export default function FlightTicketsPage() {
               <SelectPositioner>
                 <SelectPopup>
                   <SelectList>
-                    {[{ label: "All fungsi", value: ALL_FILTER_VALUE }, ...CATEGORY_OPTIONS].map((option) => (
+                    {[
+                      { label: "All fungsi", value: ALL_FILTER_VALUE },
+                      ...CATEGORY_OPTIONS,
+                    ].map((option) => (
                       <SelectItem key={option.value} value={option.value}>
                         {option.label}
                       </SelectItem>
@@ -601,11 +671,16 @@ export default function FlightTicketsPage() {
             selectedId={draftFilters.vesselName ?? null}
             loading={vesselFilterLoading}
             open={isVesselFilterOpen}
-            options={vesselFilterOptions.map<SearchableSelectOption>((vessel) => ({
-              id: vessel.name,
-              label: vessel.name,
-              meta: vessel.type === "CREWING_TANKER" ? "Crewing Tanker" : vessel.type,
-            }))}
+            options={vesselFilterOptions.map<SearchableSelectOption>(
+              (vessel) => ({
+                id: vessel.name,
+                label: vessel.name,
+                meta:
+                  vessel.type === "CREWING_TANKER"
+                    ? "Crewing Tanker"
+                    : vessel.type,
+              }),
+            )}
             placeholder="Search vessel name"
             onOpen={() => setIsVesselFilterOpen(true)}
             onClose={() => setIsVesselFilterOpen(false)}
@@ -639,7 +714,10 @@ export default function FlightTicketsPage() {
                   String(value) === ALL_FILTER_VALUE ? "" : String(value),
               }))
             }
-            items={[{ label: "All service modes", value: ALL_FILTER_VALUE }, ...SERVICE_MODE_OPTIONS]}
+            items={[
+              { label: "All service modes", value: ALL_FILTER_VALUE },
+              ...SERVICE_MODE_OPTIONS,
+            ]}
           >
             <SelectTrigger className="h-[48px] w-full rounded-[14px] border-[#d1d5db] bg-white px-4 text-[14px] text-[#111827] dark:border-white/10 dark:bg-[#151d2c] dark:text-white">
               <SelectValue placeholder="Select service mode" />
@@ -649,7 +727,10 @@ export default function FlightTicketsPage() {
               <SelectPositioner>
                 <SelectPopup>
                   <SelectList>
-                    {[{ label: "All service modes", value: ALL_FILTER_VALUE }, ...SERVICE_MODE_OPTIONS].map((option) => (
+                    {[
+                      { label: "All service modes", value: ALL_FILTER_VALUE },
+                      ...SERVICE_MODE_OPTIONS,
+                    ].map((option) => (
                       <SelectItem key={option.value} value={option.value}>
                         {option.label}
                       </SelectItem>
@@ -674,7 +755,10 @@ export default function FlightTicketsPage() {
                   String(value) === ALL_FILTER_VALUE ? "" : String(value),
               }))
             }
-            items={[{ label: "All providers", value: ALL_FILTER_VALUE }, ...PROVIDER_FILTER_OPTIONS]}
+            items={[
+              { label: "All providers", value: ALL_FILTER_VALUE },
+              ...PROVIDER_FILTER_OPTIONS,
+            ]}
           >
             <SelectTrigger className="h-[48px] w-full rounded-[14px] border-[#d1d5db] bg-white px-4 text-[14px] text-[#111827] dark:border-white/10 dark:bg-[#151d2c] dark:text-white">
               <SelectValue placeholder="Select provider" />
@@ -684,7 +768,10 @@ export default function FlightTicketsPage() {
               <SelectPositioner>
                 <SelectPopup>
                   <SelectList>
-                    {[{ label: "All providers", value: ALL_FILTER_VALUE }, ...PROVIDER_FILTER_OPTIONS].map((option) => (
+                    {[
+                      { label: "All providers", value: ALL_FILTER_VALUE },
+                      ...PROVIDER_FILTER_OPTIONS,
+                    ].map((option) => (
                       <SelectItem key={option.value} value={option.value}>
                         {option.label}
                       </SelectItem>
@@ -705,11 +792,13 @@ export default function FlightTicketsPage() {
             onValueChange={(value) =>
               setDraftFilters((current) => ({
                 ...current,
-                status:
-                  String(value) === ALL_FILTER_VALUE ? "" : String(value),
+                status: String(value) === ALL_FILTER_VALUE ? "" : String(value),
               }))
             }
-            items={[{ label: "All status", value: ALL_FILTER_VALUE }, ...STATUS_OPTIONS]}
+            items={[
+              { label: "All status", value: ALL_FILTER_VALUE },
+              ...STATUS_OPTIONS,
+            ]}
           >
             <SelectTrigger className="h-[48px] w-full rounded-[14px] border-[#d1d5db] bg-white px-4 text-[14px] text-[#111827] dark:border-white/10 dark:bg-[#151d2c] dark:text-white">
               <SelectValue placeholder="Select status" />
@@ -719,7 +808,10 @@ export default function FlightTicketsPage() {
               <SelectPositioner>
                 <SelectPopup>
                   <SelectList>
-                    {[{ label: "All status", value: ALL_FILTER_VALUE }, ...STATUS_OPTIONS].map((option) => (
+                    {[
+                      { label: "All status", value: ALL_FILTER_VALUE },
+                      ...STATUS_OPTIONS,
+                    ].map((option) => (
                       <SelectItem key={option.value} value={option.value}>
                         {option.label}
                       </SelectItem>
@@ -732,7 +824,7 @@ export default function FlightTicketsPage() {
         </div>
       </div>
     ),
-    [draftFilters, pageSize]
+    [draftFilters, pageSize],
   );
 
   return (
@@ -743,6 +835,7 @@ export default function FlightTicketsPage() {
       <DynamicPage
         columns={columns}
         rows={rows}
+        persistenceKey="flight-tickets-v3"
         loading={loading}
         rowKey={(row) => row.id}
         currentPage={page}
@@ -761,7 +854,8 @@ export default function FlightTicketsPage() {
           {
             key: "keyword",
             label: "Keyword",
-            placeholder: "Search by PNR, airline, ticket number, or reference number",
+            placeholder:
+              "Search by PNR, airline, ticket number, or reference number",
           },
           {
             key: "functionCategory",
@@ -833,7 +927,9 @@ export default function FlightTicketsPage() {
                   Upload Flight Ticket
                 </h2>
                 <p className="mt-2 text-sm text-[#7b7b86] dark:text-[#94a3b8]">
-                  Upload your flight ticket document to create a draft. Ticket details will be filled manually or from the next extraction flow.
+                  Upload your flight ticket document to create a draft. Ticket
+                  details will be filled manually or from the next extraction
+                  flow.
                 </p>
               </div>
 
@@ -845,7 +941,9 @@ export default function FlightTicketsPage() {
                     </Label>
                     <Select
                       value={selectedFunctionCategory}
-                      onValueChange={(value) => setSelectedFunctionCategory(String(value))}
+                      onValueChange={(value) =>
+                        setSelectedFunctionCategory(String(value))
+                      }
                       items={CATEGORY_OPTIONS}
                     >
                       <SelectTrigger className="h-[42px] w-full rounded-[14px] border-[#d1d5db] bg-white px-5 text-[15px] text-[#111827] dark:border-white/10 dark:bg-[#151d2c] dark:text-white">
@@ -857,7 +955,10 @@ export default function FlightTicketsPage() {
                           <SelectPopup>
                             <SelectList>
                               {CATEGORY_OPTIONS.map((option) => (
-                                <SelectItem key={option.value} value={option.value}>
+                                <SelectItem
+                                  key={option.value}
+                                  value={option.value}
+                                >
                                   {option.label}
                                 </SelectItem>
                               ))}
@@ -874,7 +975,9 @@ export default function FlightTicketsPage() {
                     </Label>
                     <Select
                       value={selectedAssign}
-                      onValueChange={(value) => setSelectedAssign(String(value))}
+                      onValueChange={(value) =>
+                        setSelectedAssign(String(value))
+                      }
                       items={ASSIGN_OPTIONS}
                     >
                       <SelectTrigger className="h-[42px] w-full rounded-[14px] border-[#d1d5db] bg-white px-5 text-[15px] text-[#111827] dark:border-white/10 dark:bg-[#151d2c] dark:text-white">
@@ -886,7 +989,10 @@ export default function FlightTicketsPage() {
                           <SelectPopup>
                             <SelectList>
                               {ASSIGN_OPTIONS.map((option) => (
-                                <SelectItem key={option.value} value={option.value}>
+                                <SelectItem
+                                  key={option.value}
+                                  value={option.value}
+                                >
                                   {option.label}
                                 </SelectItem>
                               ))}
@@ -903,7 +1009,9 @@ export default function FlightTicketsPage() {
                     </Label>
                     <Select
                       value={selectedServiceMode}
-                      onValueChange={(value) => setSelectedServiceMode(String(value))}
+                      onValueChange={(value) =>
+                        setSelectedServiceMode(String(value))
+                      }
                       items={SERVICE_MODE_OPTIONS}
                     >
                       <SelectTrigger className="h-[42px] w-full rounded-[14px] border-[#d1d5db] bg-white px-5 text-[15px] text-[#111827] dark:border-white/10 dark:bg-[#151d2c] dark:text-white">
@@ -915,7 +1023,10 @@ export default function FlightTicketsPage() {
                           <SelectPopup>
                             <SelectList>
                               {SERVICE_MODE_OPTIONS.map((option) => (
-                                <SelectItem key={option.value} value={option.value}>
+                                <SelectItem
+                                  key={option.value}
+                                  value={option.value}
+                                >
                                   {option.label}
                                 </SelectItem>
                               ))}
@@ -926,14 +1037,15 @@ export default function FlightTicketsPage() {
                     </Select>
                   </div>
 
-
                   <div className="space-y-2.5">
                     <Label className="text-[14px] font-medium text-[#374151] dark:text-[#d1d5db]">
                       Provider/Vendor
                     </Label>
                     <Select
                       value={selectedProvider}
-                      onValueChange={(value) => setSelectedProvider(String(value))}
+                      onValueChange={(value) =>
+                        setSelectedProvider(String(value))
+                      }
                       items={FLIGHT_TICKET_PROVIDERS}
                     >
                       <SelectTrigger className="h-[42px] rounded-[14px] border-[#d1d5db] bg-white px-5 text-[15px] text-[#111827] dark:border-white/10 dark:bg-[#151d2c] dark:text-white">
@@ -945,7 +1057,10 @@ export default function FlightTicketsPage() {
                           <SelectPopup>
                             <SelectList>
                               {FLIGHT_TICKET_PROVIDERS.map((provider) => (
-                                <SelectItem key={provider.value} value={provider.value}>
+                                <SelectItem
+                                  key={provider.value}
+                                  value={provider.value}
+                                >
                                   {provider.label}
                                 </SelectItem>
                               ))}
@@ -971,7 +1086,8 @@ export default function FlightTicketsPage() {
                       Drag and drop file here or choose file
                     </p>
                     <p className="text-sm text-[#8b8fa4] dark:text-[#94a3b8]">
-                      Supported format: PDF only (photos or screenshots of results are not accepted).
+                      Supported format: PDF only (photos or screenshots of
+                      results are not accepted).
                     </p>
                     {selectedFile ? (
                       <p className="mt-4 rounded-full bg-white px-4 py-2 text-xs font-semibold text-[#111827] dark:bg-[#111827] dark:text-white">
@@ -1011,7 +1127,11 @@ export default function FlightTicketsPage() {
                   >
                     {uploading ? (
                       <>
-                        <HugeiconsIcon icon={Loading03Icon} size={18} className="animate-spin" />
+                        <HugeiconsIcon
+                          icon={Loading03Icon}
+                          size={18}
+                          className="animate-spin"
+                        />
                         Uploading...
                       </>
                     ) : (
